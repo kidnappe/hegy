@@ -1,0 +1,96 @@
+name: Bug 报告
+description: 报告一个可复现的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。提交前请先确认：
+        - 已经搜索过现有 Issue；
+        - 没有粘贴真实 API Key、用户记录或含个人信息的截图；
+        - 安全问题请走 Security 私密报告，不要开公开 Issue。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 尽量用一句话描述问题，再补充细节。
+      placeholder: 例如：导出 3D 离线 HTML 后，在手机上打开横向溢出。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开 ...
+        2. 输入 ...
+        3. 点击 ...
+        4. 看到 ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 运行形态
+      options:
+        - 浏览器（node solver/serve.js）
+        - Windows 桌面版（Electron）
+        - 离线导出 HTML
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: 环境
+      description: 操作系统、Node 版本、浏览器 / 设备、应用版本。
+      placeholder: Windows 11 / Node 22.23 / Edge 142 / 何解 1.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: 模型服务
+      description: 服务商 + 模型名（不需要提供 Key）。
+      placeholder: DeepSeek / deepseek-chat
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: 浏览器控制台、状态栏错误日志、截图。请先删掉密钥和个人信息。
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认
+      options:
+        - label: 我已删除 API Key、用户记录和个人信息
+          required: true
+        - label: 我搜索过现有 Issue，没有重复
+          required: true

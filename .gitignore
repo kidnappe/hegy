@@ -1,0 +1,76 @@
+# ============================================================
+# 依赖
+# ============================================================
+node_modules/
+desktop/node_modules/
+mobile/node_modules/
+
+# ============================================================
+# 构建产物
+# ============================================================
+desktop/dist/
+desktop/dist-arm64/
+
+# 可选：本地 Android / Capacitor 构建（不随公开仓库分发）
+mobile/www/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/android/app/src/main/assets/public/
+mobile/android/app/src/main/assets/capacitor.config.json
+mobile/android/app/src/main/assets/capacitor.plugins.json
+mobile/android/app/src/main/res/xml/config.xml
+mobile/android/capacitor-cordova-android-plugins/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# ============================================================
+# 临时目录、实验脚本与备份（含本机状态，勿入库）
+# ============================================================
+.tmp/
+_check/
+_backup/
+.workbuddy-ai/
+demo/
+mobile/proto/
+mobile/tools/shots/
+
+# ============================================================
+# 测试截图、导出物与生成海报
+# ============================================================
+tools/shots_new/
+tools/mobile_shots/
+tools/exports/
+poster/
+
+# ============================================================
+# 视频与大素材（不随主仓库分发，放到 Release 或独立仓库）
+# ============================================================
+video-intro/
+video-kit/
+
+# ============================================================
+# 使用说明书为生成产物，不随仓库分发
+# ============================================================
+docs/manual/
+
+# ============================================================
+# 本地配置与密钥
+# ============================================================
+solver/config.json
+.env
+.env.*
+*.local.json
+*.log
+*.bak
+*.bak_*
+
+# ============================================================
+# 系统文件
+# ============================================================
+Thumbs.db
+desktop.ini
+.DS_Store

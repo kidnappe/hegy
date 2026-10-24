@@ -1,0 +1,32 @@
+const { spawn } = require('child_process');
+const path = require('path'); const os = require('os');
+const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const PORT = 9432;
+const FILE = path.join(os.tmpdir(), 'hegy-export-tabs', 'old_2d.html');
+const prof = path.join(os.tmpdir(), 'edge-diag-export-tabs3');
+const proc = spawn(EDGE, ['--headless=new','--remote-debugging-port='+PORT,'--user-data-dir='+prof,'--no-first-run','--no-default-browser-check','--disable-gpu','about:blank'], {stdio:'ignore'});
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+(async()=>{
+  let ver=null; for(let i=0;i<60;i++){try{ver=await(await fetch('http://127.0.0.1:'+PORT+'/json/version')).json();break}catch(e){await sleep(250)}}
+  const t=await(await fetch('http://127.0.0.1:'+PORT+'/json/new?'+encodeURIComponent('file:///'+FILE.replace(/\\/g,'/')),{method:'PUT'})).json();
+  const ws=new WebSocket(t.webSocketDebuggerUrl); let id=0; const pend=new Map(); const errs=[];
+  ws.addEventListener('message',ev=>{const m=JSON.parse(ev.data); if(m.id&&pend.has(m.id)){pend.get(m.id)(m);pend.delete(m.id)} if(m.method==='Runtime.exceptionThrown')errs.push(JSON.stringify(m.params.exceptionDetails))});
+  await new Promise(r=>ws.addEventListener('open',r));
+  const send=(method,params)=>new Promise(res=>{const i=++id;pend.set(i,res);ws.send(JSON.stringify({id:i,method,params:params||{}}))});
+  const ev=async expr=>{const r=await send('Runtime.evaluate',{expression:expr,returnByValue:true,awaitPromise:true}); if(r.result&&r.result.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails)); return r.result&&r.result.result?r.result.result.value:null};
+  const until=async(expr,ms)=>{const t0=Date.now();while(Date.now()-t0<ms){const v=await ev(expr).catch(()=>false);if(v)return v;await sleep(300)}return false};
+  await send('Runtime.enable');
+  await until('!!(window.board&&window.board.objects)',20000); await sleep(1200);
+  const vis = `(function(){var o={};for(var k in window.board.objects){var e=window.board.objects[k];var n=e&&e.name==null?'':String(e.name||'').trim();if(n&&['A','B','C','D','E','F','G','P','H','F位置%'].indexOf(n)>=0)o[n]=!!(e.visProp&&e.visProp.visible!==false);}return o})()`;
+  console.log('initial', JSON.stringify(await ev(vis)));
+  const clickStep = async (text) => { await ev(`(function(){var bs=[].slice.call(document.querySelectorAll('#expSteps button'));var b=bs.filter(function(x){return x.textContent===${JSON.stringify(text)}})[0];if(b)b.click();return 1})()`); await sleep(600); };
+  await clickStep('作三角形 ABC'); console.log('step1', JSON.stringify(await ev(vis)));
+  await clickStep('图3：CG 与 PH'); console.log('step4', JSON.stringify(await ev(vis)));
+  await ev(`(function(){var ls=[].slice.call(document.querySelectorAll('#expCtrls label'));var l=ls.filter(function(x){return x.textContent.indexOf('图3')>=0})[0];if(l)l.querySelector('input').click();return 1})()`); await sleep(600);
+  console.log('step4+ctl', JSON.stringify(await ev(vis)));
+  await clickStep('全部'); console.log('all+ctl', JSON.stringify(await ev(vis)));
+  await ev(`(function(){var ls=[].slice.call(document.querySelectorAll('#expCtrls label'));var l=ls.filter(function(x){return x.textContent.indexOf('图3')>=0})[0];if(l)l.querySelector('input').click();return 1})()`); await sleep(600);
+  console.log('all-ctl', JSON.stringify(await ev(vis)));
+  console.log('errors', JSON.stringify(errs));
+  proc.kill(); process.exit(0);
+})().catch(e=>{console.log('FATAL',e.message);proc.kill();process.exit(1)});

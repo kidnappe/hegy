@@ -1,0 +1,25 @@
+{
+  "name": "hegy",
+  "version": "1.1.0",
+  "private": true,
+  "description": "何解 · 本地运行的 AI 动态几何解题器",
+  "license": "AGPL-3.0-only",
+  "author": "zhouxuan and Hegy contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kidnappe/hegy.git"
+  },
+  "homepage": "https://github.com/kidnappe/hegy#readme",
+  "bugs": {
+    "url": "https://github.com/kidnappe/hegy/issues"
+  },
+  "scripts": {
+    "start": "node solver/serve.js 8099",
+    "mock": "node solver/mock.js",
+    "test": "node tools/verify.js",
+    "check": "node tools/verify.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,39 @@
+# 默认按文本处理；Git 会在索引里统一换行，工作区保持平台习惯。
+* text=auto
+
+# Windows 脚本必须保持 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制资源
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.bmp binary
+*.woff2 binary
+*.woff binary
+*.ttf binary
+*.otf binary
+*.mp4 binary
+*.webm binary
+*.wav binary
+*.mp3 binary
+*.zip binary
+
+# 第三方代码：不要在语言统计里算成本项目代码
+solver/vendor/jsxgraph.js linguist-vendored
+solver/vendor/jsxgraph.css linguist-vendored
+solver/vendor/katex/** linguist-vendored
+solver/vendor/icons.js linguist-vendored
+solver/vendor3d/three.min.js linguist-vendored
+solver/vendor3d/OrbitControls.js linguist-vendored
+
+# 提示词与生成文档
+solver/prompt.txt linguist-documentation
+solver/chat-prompt.txt linguist-documentation
+solver/prompt-rules.md linguist-documentation
+docs/manual/** linguist-documentation

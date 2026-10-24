@@ -1,0 +1,70 @@
+{
+  "name": "hegy",
+  "productName": "何解",
+  "version": "1.1.0",
+  "private": true,
+  "description": "何解 · 动态几何解题（桌面便携版）",
+  "author": "zhouxuan and Hegy contributors",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kidnappe/hegy.git"
+  },
+  "homepage": "https://github.com/kidnappe/hegy#readme",
+  "bugs": {
+    "url": "https://github.com/kidnappe/hegy/issues"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "node tools/patch-portable-nsis.js && electron-builder --win portable --x64",
+    "dist:arm64": "node tools/patch-portable-nsis.js && electron-builder --win portable --arm64 -c.directories.output=dist-arm64 && node tools/rename-arm64.js"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.hegy.app",
+    "productName": "何解",
+    "asar": false,
+    "compression": "maximum",
+    "electronLanguages": ["zh-CN", "en-US"],
+    "portable": {
+      "useZip": true,
+      "splashImage": "build/splash.bmp"
+    },
+    "extraResources": [
+      { "from": "../LICENSE", "to": "app/LICENSE" }
+    ],
+    "files": [
+      "main.js",
+      { "from": "../solver", "to": "solver", "filter": [
+        "**/*",
+        "!shot_*",
+        "!shot.js",
+        "!shot2.js",
+        "!shot3.js",
+        "!_export_test.html",
+        "!_rec*",
+        "!_refs.txt",
+        "!export_*.png",
+        "!icon-prompts.md",
+        "!mock.js",
+        "!config.example.json",
+        "!*.log",
+        "!*.bak",
+        "!config.json",
+        "!example_*.js"
+      ] }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "artifactName": "何解-${version}-便携版.${ext}"
+    }
+  }
+}

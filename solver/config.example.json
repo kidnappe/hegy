@@ -1,0 +1,7 @@
+{
+  "baseUrl": "https://api.deepseek.com/v1",
+  "apiKey": "在此填入你的 API Key（不要把带 key 的文件提交/外传）",
+  "model": "deepseek-chat",
+  "temperature": 0.2,
+  "jsonMode": true
+}

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>网格演示 · 2D / 3D</title>
+<link rel="stylesheet" href="../solver/vendor/jsxgraph.css">
+<style>
+  :root{ --ink:#1f2328; --mute:#6b7280; --line:#e5e7eb; --card:#fff; --page:#f6f7f9; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{padding:18px 22px 10px}
+  h1{margin:0 0 4px;font-size:17px;font-weight:600}
+  .sub{color:var(--mute);font-size:13px}
+  .wrap{display:flex;gap:16px;padding:12px 22px 22px;align-items:flex-start}
+  .card{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .card h2{margin:0;padding:10px 14px;font-size:13px;font-weight:600;border-bottom:1px solid var(--line);background:#fbfbfc}
+  .card h2 span{font-weight:400;color:var(--mute);margin-left:6px}
+  .canvas{height:440px;position:relative;background:#fff}
+  .bar{display:flex;gap:14px;align-items:center;padding:8px 14px;border-top:1px solid var(--line);background:#fbfbfc;font-size:13px;color:var(--mute);flex-wrap:wrap}
+  .bar label{display:flex;gap:6px;align-items:center;cursor:pointer;color:var(--ink)}
+  .bar input{accent-color:#1890ff}
+  .tip{padding:8px 14px 12px;font-size:12.5px;color:var(--mute)}
+  @media (max-width:900px){ .wrap{flex-direction:column} .canvas{height:360px} }
+</style>
+</head>
+<body>
+<header>
+  <h1>网格演示：2D 建系（方案 A） vs 3D 底面网格（方案 B）</h1>
+  <div class="sub">同一套配色与线宽，勾选框可实时开关，方便直接对比"加"和"不加"的观感。</div>
+</header>
+
+<div class="wrap">
+  <section class="card">
+    <h2>2D 建系图 <span>JSXGraph · 网格 + 彩色 x/y 箭头</span></h2>
+    <div id="b2d" class="canvas"></div>
+    <div class="bar">
+      <label><input type="checkbox" id="g2d" checked> 网格</label>
+      <label><input type="checkbox" id="t2d" checked> 刻度数字</label>
+      <span>示例：抛物线 y² = 4x，焦点 F(1,0)</span>
+    </div>
+    <div class="tip">2D 网格是课堂标准画法，学生不会误读；成本几乎为零（JSXGraph 自带）。</div>
+  </section>
+
+  <section class="card">
+    <h2>3D 建系图 <span>three.js · 只在 xOy 底面画网格</span></h2>
+    <div id="b3d" class="canvas"></div>
+    <div class="bar">
+      <label><input type="checkbox" id="g3d" checked> 底面网格</label>
+      <label><input type="checkbox" id="t3d"> 刻度数字</label>
+      <span>示例：棱长 2 的正方体，A 在原点</span>
+    </div>
+    <div class="tip">3D 只画一层底面、淡色、每 1 单位一条、默认不标数字；可拖动旋转对比。</div>
+  </section>
+</div>
+
+<script src="../solver/vendor/jsxgraph.js"></script>
+<script src="../solver/vendor3d/three.min.js"></script>
+<script src="../solver/vendor3d/OrbitControls.js"></script>
+<script>
+/* ---------------- 2D ---------------- */
+(function () {
+  var board = JXG.JSXGraph.initBoard('b2d', {
+    boundingbox: [-1.3, 4.4, 5.4, -1.3], axis: false, showNavigation: false,
+    showCopyright: false, keepaspectratio: true, pan: { enabled: false }
+  });
+
+  var grid = board.create('grid', [], {
+    gridX: 1, gridY: 1, strokeColor: '#e2e2e2', strokeWidth: 1, fixed: true
+  });
+
+  var ticks = [];
+  for (var i = 1; i <= 5; i++) {
+    ticks.push(board.create('text', [i, -0.34, i], { fontSize: 11, strokeColor: '#9aa0a6', fixed: true, anchorX: 'middle' }));
+    if (i <= 4) ticks.push(board.create('text', [-0.3, i, i], { fontSize: 11, strokeColor: '#9aa0a6', fixed: true, anchorX: 'right' }));
+  }
+
+  board.create('arrow', [[0, 0], [4.8, 0]], { strokeColor: '#d32f2f', strokeWidth: 2, fixed: true, lastArrow: { type: 2, size: 7 } });
+  board.create('arrow', [[0, 0], [0, 4.2]], { strokeColor: '#2e7d32', strokeWidth: 2, fixed: true, lastArrow: { type: 2, size: 7 } });
+  board.create('text', [4.95, -0.05, 'x'], { fontSize: 14, strokeColor: '#d32f2f', fixed: true });
+  board.create('text', [0.12, 4.25, 'y'], { fontSize: 14, strokeColor: '#2e7d32', fixed: true });
+
+  board.create('functiongraph', [function (x) { return Math.sqrt(4 * x); }, 0, 4.2], { strokeColor: '#185FA5', strokeWidth: 2 });
+  board.create('point', [1, 0], { name: 'F', size: 3, fillColor: '#d32f2f', strokeColor: '#d32f2f', label: { offset: [4, -12], fontSize: 12 } });
+  board.create('point', [0, 0], { name: 'O', size: 3, fillColor: '#333', strokeColor: '#333', label: { offset: [-12, 6], fontSize: 12 } });
+
+  document.getElementById('g2d').onchange = function () { grid.visible = this.checked; board.update(); };
+  document.getElementById('t2d').onchange = function () { ticks.forEach(function (t) { t.visible = this.checked; }, this); board.update(); };
+})();
+
+/* ---------------- 3D ---------------- */
+(function () {
+  var host = document.getElementById('b3d');
+  var W = host.clientWidth || 480, H = host.clientHeight || 440;
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  renderer.setSize(W, H);
+  renderer.setClearColor(0xffffff, 1);
+  host.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x777788, 1.0));
+  var dl = new THREE.DirectionalLight(0xffffff, 0.55); dl.position.set(2, 3, 2); scene.add(dl);
+
+  var camera = new THREE.PerspectiveCamera(45, W / H, 0.01, 500);
+  camera.up.set(0, 0, 1);                       // z 竖直向上，与产品一致
+  var target = new THREE.Vector3(1, 1, 1);
+  camera.position.copy(target).add(new THREE.Vector3(1, 0.7, 1.3).normalize().multiplyScalar(8.2));
+  camera.lookAt(target);
+
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.copy(target); controls.enableDamping = true; controls.dampingFactor = 0.08;
+
+  /* 正方体 A(0,0,0) 棱长 2 */
+  var P = {
+    A: [0, 0, 0], B: [2, 0, 0], C: [2, 2, 0], D: [0, 2, 0],
+    A1: [0, 0, 2], B1: [2, 0, 2], C1: [2, 2, 2], D1: [0, 2, 2]
+  };
+  var edges = [['A','B'],['B','C'],['C','D'],['D','A'],['A1','B1'],['B1','C1'],['C1','D1'],['D1','A1'],['A','A1'],['B','B1'],['C','C1'],['D','D1']];
+  var pos = [];
+  edges.forEach(function (e) {
+    pos.push.apply(pos, P[e[0]]); pos.push.apply(pos, P[e[1]]);
+  });
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x37474f })));
+
+  /* 顶点标签 */
+  function label(text, color) {
+    var c = document.createElement('canvas'); c.width = 128; c.height = 64;
+    var g = c.getContext('2d');
+    g.font = 'bold 44px "Microsoft YaHei",sans-serif';
+    g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text, 64, 34);
+    var tex = new THREE.CanvasTexture(c); tex.needsUpdate = true;
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+    sp.scale.set(0.78, 0.39, 1);
+    return sp;
+  }
+  Object.keys(P).forEach(function (k) {
+    var sp = label(k.replace('1', '₁'), '#111');
+    sp.position.set(P[k][0] + 0.12, P[k][1] + 0.12, P[k][2] + 0.18);
+    scene.add(sp);
+  });
+
+  /* 三色轴 */
+  var AX = 2.9;
+  [[1,0,0,0xd32f2f,'x'], [0,1,0,0x2e7d32,'y'], [0,0,1,0x1565c0,'z']].forEach(function (a) {
+    var dir = new THREE.Vector3(a[0], a[1], a[2]);
+    scene.add(new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), AX, a[3], AX * 0.08, AX * 0.04));
+    var sp = label(a[4], '#' + a[3].toString(16));
+    sp.position.copy(dir.clone().multiplyScalar(AX + 0.35));
+    scene.add(sp);
+  });
+
+  /* 底面网格（xOy，z=0）：10×10，每格 1 单位 */
+  var grid = new THREE.GridHelper(8, 8, 0xd0d0d0, 0xe8e8e8);
+  grid.rotation.x = Math.PI / 2;      // 默认在 XZ 平面，转到 XY
+  grid.position.set(0, 0, 0);
+  scene.add(grid);
+
+  /* 刻度数字（默认关） */
+  var tickGroup = new THREE.Group();
+  for (var i = 1; i <= 4; i++) {
+    var sx = label(String(i), '#9aa0a6'); sx.scale.set(0.42, 0.21, 1); sx.position.set(i, -0.34, 0.02); tickGroup.add(sx);
+    var sy = label(String(i), '#9aa0a6'); sy.scale.set(0.42, 0.21, 1); sy.position.set(-0.34, i, 0.02); tickGroup.add(sy);
+  }
+  tickGroup.visible = false;
+  scene.add(tickGroup);
+
+  document.getElementById('g3d').onchange = function () { grid.visible = this.checked; };
+  document.getElementById('t3d').onchange = function () { tickGroup.visible = this.checked; };
+
+  function resize() {
+    var w = host.clientWidth, h = host.clientHeight;
+    if (!w || !h) return;
+    camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
+  }
+  window.addEventListener('resize', resize);
+
+  (function loop() {
+    requestAnimationFrame(loop);
+    controls.update();
+    renderer.render(scene, camera);
+  })();
+})();
+</script>
+</body>
+</html>
