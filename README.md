@@ -8,11 +8,7 @@
 
 本地运行的 AI 动态几何解题器 · 不注册 · 不上传 · 不需要构建
 
-<a href="https://github.com/kidnappe/hegy/releases/latest"><img src="https://img.shields.io/github/v/release/kidnappe/hegy?style=flat-square&label=%E7%94%B5%E8%84%91%E7%AB%AF&color=6e56cf" alt="电脑端版本" /></a>
-<a href="https://github.com/kidnappe/hegy/releases/tag/mobile-v1.2.1"><img src="https://img.shields.io/badge/%E6%89%8B%E6%9C%BA%E7%AB%AF-1.2.1-3ddc84?style=flat-square&logo=android&logoColor=white" alt="手机端版本" /></a>
-<img src="https://img.shields.io/badge/license-AGPL--3.0-1f6feb?style=flat-square" alt="许可证" />
-<img src="https://img.shields.io/badge/node-%E2%89%A5%2018-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js" />
-<a href="https://github.com/kidnappe/hegy/actions/workflows/ci.yml"><img src="https://github.com/kidnappe/hegy/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+<img src="https://img.shields.io/badge/%E7%94%B5%E8%84%91%E7%AB%AF-1.2.1-6e56cf?style=flat-square" alt="电脑端版本" /> <img src="https://img.shields.io/badge/%E6%89%8B%E6%9C%BA%E7%AB%AF-1.2.1-3ddc84?style=flat-square&logo=android&logoColor=white" alt="手机端版本" /> <img src="https://img.shields.io/badge/license-AGPL--3.0-1f6feb?style=flat-square" alt="许可证" /> <img src="https://img.shields.io/badge/node-%E2%89%A5%2018-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js" /> <a href="https://github.com/kidnappe/hegy/actions/workflows/ci.yml"><img src="https://github.com/kidnappe/hegy/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 
 <a href="https://kidnappe.github.io/hegy/">发布页</a> · <a href="https://github.com/kidnappe/hegy/releases">下载</a> · <a href="docs/DEVELOPMENT.md">开发文档</a> · <a href="STYLE.md">产品与风格</a> · <a href="CONTRIBUTING.md">参与贡献</a>
 
