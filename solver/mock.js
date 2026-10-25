@@ -255,6 +255,15 @@ http.createServer((req, res) => {
     const mm = q.match(/【当前题目】\n([\s\S]*?)\n\n【当前答案】/);
     if (mm) qq = mm[1];
     qq = qq.split("【重要】")[0];
+    // 给定答案段里提到 renderCode / render3d 只是输出格式说明，不能参与 2D/3D 路由判断
+    qq = qq.split("【用户给定答案")[0];
+    // 去掉前置的说明块（【年级设定】/【视角】+【画法】/【图形类型】…）：
+    // 这些说明里会出现「3D 图形」「render3d」这类字样，会把 mock 的 2D/3D 路由带偏。
+    for (let guard = 0; guard < 8 && /^【[^\n]*】/.test(qq); guard++) {
+      const cut = qq.indexOf("\n\n");
+      if (cut < 0) break;
+      qq = qq.slice(cut + 2);
+    }
     qq = qq.replace(/^【年级设定】[^\n]*\n\n/, "");
     const retried = /【重要】上次输出不合格/.test(q);
     const badJson = /坏JSON/.test(qq) && !isRefine && !retried;
@@ -276,15 +285,15 @@ http.createServer((req, res) => {
     const givenAnswer = giv ? giv[2].trim() : "";
     const givenLabel = giv ? giv[1] : "";
     const obj = reply(qq, nImg, isRefine, broken, scopeQi, badRefine, target, force2, force3, optionScope);
-    // 答案截图（改答案 → 粘贴图片）：模型从图里读出答案原文写进 givenAnswerText；
+    // 答案截图：微调与「未解题先给答案」都会带【答案图片】；模型从图里读出答案原文写进 givenAnswerText；
     // 若同时给了文字答案，以文字为准（下面的 applyGivenAnswer 用文字）。
-    const hasAnsImg = isRefine && /【答案图片】/.test(q);
+    const hasAnsImg = /【答案图片】/.test(q);
     if (hasAnsImg) {
       const ocr = "（mock 识别）∠DFE=10°。\n(1) 由角平分线得 $\\angle BAD=\\angle DAC=40^\\circ$；\n(2) 因为 $FE\\perp BC$，所以 $\\angle DFE=10^\\circ$。";
       obj.givenAnswerText = ocr;
       if (!givenAnswer) applyGivenAnswer(obj, ocr, "整题", scopeQi);
     }
-    if (isRefine && givenAnswer) applyGivenAnswer(obj, givenAnswer, givenLabel, scopeQi);
+    if (givenAnswer) applyGivenAnswer(obj, givenAnswer, givenLabel, scopeQi);
     // 微调请求里必须带上「当前解析 / 当前各小题」上下文，否则模型无法"只改某一部分而其余保持"
     if (isRefine) obj.analysis = (obj.analysis || "") + "\n（mock上下文：解析" + (/【当前解析】/.test(q) ? "√" : "×") + " / 小题" + (/【当前各小题】/.test(q) ? "√" : "×") + "）";
     if (grade) obj.analysis = (obj.analysis || "") + "\n（mock年级：" + grade + "）";

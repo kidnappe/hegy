@@ -8,7 +8,7 @@
 
 本地运行的 AI 动态几何解题器 · 不注册 · 无遥测 · 免构建
 
-<img src="https://img.shields.io/badge/%E7%94%B5%E8%84%91%E7%AB%AF-1.2.1-6e56cf?style=flat-square" alt="电脑端版本" /> <img src="https://img.shields.io/badge/%E6%89%8B%E6%9C%BA%E7%AB%AF-1.2.1-3ddc84?style=flat-square&logo=android&logoColor=white" alt="手机端版本" /> <img src="https://img.shields.io/badge/license-AGPL--3.0-1f6feb?style=flat-square" alt="许可证" /> <img src="https://img.shields.io/badge/node-%E2%89%A5%2018-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js" /> <a href="https://github.com/kidnappe/hegy/actions/workflows/ci.yml"><img src="https://github.com/kidnappe/hegy/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+<img src="https://img.shields.io/badge/%E7%94%B5%E8%84%91%E7%AB%AF-1.2.2-6e56cf?style=flat-square" alt="电脑端版本" /> <img src="https://img.shields.io/badge/%E6%89%8B%E6%9C%BA%E7%AB%AF-1.2.1-3ddc84?style=flat-square&logo=android&logoColor=white" alt="手机端版本" /> <img src="https://img.shields.io/badge/license-AGPL--3.0-1f6feb?style=flat-square" alt="许可证" /> <img src="https://img.shields.io/badge/node-%E2%89%A5%2018-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js" /> <a href="https://github.com/kidnappe/hegy/actions/workflows/ci.yml"><img src="https://github.com/kidnappe/hegy/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 
 <a href="https://kidnappe.github.io/hegy/">发布页</a> · <a href="https://github.com/kidnappe/hegy/releases">下载</a> · <a href="docs/DEVELOPMENT.md">开发文档</a> · <a href="STYLE.md">产品与风格</a> · <a href="CONTRIBUTING.md">参与贡献</a>
 
@@ -97,8 +97,8 @@
 
 | 平台 | 文件 | 体积 | 说明 |
 |---|---|---|---|
-| Windows x64 | [`hegy-1.2.1-setup-x64.exe`](https://github.com/kidnappe/hegy/releases/latest) | 65 MB | 安装版，带开始菜单与卸载项 |
-| Windows x64 | [`hegy-1.2.1-portable-x64.exe`](https://github.com/kidnappe/hegy/releases/latest) | 91 MB | 便携版，双击即用；用户数据放在 exe 同目录 `HegyData/` |
+| Windows x64 | [`hegy-1.2.2-setup-x64.exe`](https://github.com/kidnappe/hegy/releases/latest) | 65 MB | 安装版，带开始菜单与卸载项 |
+| Windows x64 | [`hegy-1.2.2-portable-x64.exe`](https://github.com/kidnappe/hegy/releases/latest) | 91 MB | 便携版，双击即用；用户数据放在 exe 同目录 `HegyData/` |
 | Android 7.0+ | [`hegy-1.2.1-android-release.apk`](https://github.com/kidnappe/hegy/releases/tag/mobile-v1.2.1) | 4.8 MB | 正式签名，侧载安装 |
 
 每次发布都附带 `SHA256SUMS.txt`，下载后可自行校验。所有版本见 [Releases](https://github.com/kidnappe/hegy/releases)；想看界面和更新说明，去[发布页](https://kidnappe.github.io/hegy/)。

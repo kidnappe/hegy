@@ -42,15 +42,25 @@
     } catch (e) { return "default"; }
   }
 
-  function readTheme() {
+  function readThemeMode() {
     try {
       var t = localStorage.getItem("solver_theme_v1");
-      return t === "dark" ? "dark" : "light";
+      return t === "dark" || t === "light" ? t : "auto";
+    } catch (e) { return "auto"; }
+  }
+
+  function systemTheme() {
+    try {
+      return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     } catch (e) { return "light"; }
   }
 
-  // P6 起 03/04 也有夜间（单独设计，见 skins.css 暗色块）：主题只跟用户偏好走
-  function effectiveTheme() { return readTheme(); }
+  // P6 起 03/04 也有夜间（单独设计，见 skins.css 暗色块）。
+  // 主题偏好 auto = 跟随系统，解析成实际明暗后才写 data-theme。
+  function effectiveTheme() {
+    var mode = readThemeMode();
+    return mode === "auto" ? systemTheme() : mode;
+  }
 
   // 画布 palette。default = 现有代码字面值：
   //  - 2D 网格 #e2e2e2（solver.js ensureGrid2D）；axis2d:null = 不动轴色（模型/JSXGraph 自己的）
@@ -91,6 +101,7 @@
     canvas: CANVAS,
     current: current,
     palette: palette,
+    themeMode: readThemeMode,
     effectiveTheme: effectiveTheme,
     apply: apply,
     set: set

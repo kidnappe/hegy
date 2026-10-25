@@ -167,14 +167,73 @@ svg.ico-lg{width:18px;height:18px;}
   flex:none;display:flex;gap:10px;padding:10px 14px;
   background:var(--panel);border-bottom:1px solid var(--line);
 }#inputCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;}
-#q{
-  width:100%;min-height:56px;max-height:180px;padding:10px 12px;
-  border:1px solid var(--line);border-radius:9px;font-size:13.5px;
-  font-family:inherit;line-height:1.6;resize:vertical;background:var(--panel-2);
-  transition:.12s;
+/* 输入框外壳：textarea 去掉自己的边框，边框/焦点态/拖拽高亮都画在外壳上，
+   缩略图条挂在外壳内部，视觉上就是「图在输入框里」。 */
+.input-shell{
+  display:flex;flex-direction:column;
+  border:1px solid var(--line);border-radius:9px;background:var(--panel-2);
+  transition:border-color .12s,background-color .12s,box-shadow .12s;
 }
-#q:focus{outline:none;border-color:var(--accent);background:var(--panel);box-shadow:0 0 0 3px rgba(91,91,214,.10);}
-#q.drop{border-color:var(--accent);background:var(--accent-2);}
+.input-shell:focus-within{
+  border-color:var(--accent);background:var(--panel);
+  box-shadow:0 0 0 3px rgba(91,91,214,.10);
+}
+.input-shell.drop{border-color:var(--accent);background:var(--accent-2);}
+.input-shell-field{position:relative;}
+#qShell{position:relative;}
+.input-thumbs{display:flex;gap:7px;flex-wrap:wrap;padding:0 10px 9px;}
+.input-thumbs:empty{display:none;}
+/* 有图时图片排到文字输入行上方，像附件预览；文字只作可选补充 */
+#qShell.has-imgs .input-thumbs,
+#ansPreShell.has-imgs .input-thumbs{order:-1;padding:9px 10px 0;}
+/* 题目框右上角有收起键，缩略图别排到它下面 */
+#qShell.has-imgs .input-thumbs{padding-right:38px;}
+#thumbs:empty{display:none;}
+#q{
+  display:block;width:100%;min-height:56px;max-height:180px;padding:10px 42px 10px 12px;
+  border:none;border-radius:0;font-size:13.5px;
+  font-family:inherit;line-height:1.6;resize:vertical;background:transparent;
+  transition:background-color .12s;
+}
+#q:focus{outline:none;background:transparent;box-shadow:none;}
+/* 只有图片、还没补文字：题目框收成一行，长示例占位换成短提示，别把画布挤扁 */
+#qShell.imgs-only #q{height:30px;min-height:30px;padding:3px 42px 5px 12px;resize:none;}
+/* 题目框右上角的收起键：展开时朝上，收起后朝下 */
+.input-fold{
+  position:absolute;top:5px;right:5px;width:24px;height:24px;padding:0;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid transparent;border-radius:6px;background:transparent;
+  color:var(--txt-3);cursor:pointer;
+}
+.input-fold:hover{background:var(--hover);color:var(--accent);}
+.input-fold svg{transition:transform .15s;}
+#qShell:not(.collapsed) .input-fold svg{transform:rotate(180deg);}
+/* 收起后：一行摘要 + 右侧缩略图，缩略图与文字等高，点开仍能看大图 */
+#qShell.collapsed{flex-direction:row;align-items:center;gap:6px;min-height:32px;padding:5px 6px 5px 10px;}
+#qShell.collapsed .input-shell-field{display:none;}
+#qShell.collapsed #qFolded{display:flex;flex:1 1 auto;}
+#qShell.collapsed #thumbs{flex:none;flex-wrap:nowrap;gap:5px;max-width:50%;overflow:hidden;padding:0;order:0;}
+#qShell.collapsed #qFold{position:static;flex:none;width:20px;height:20px;}
+#qShell.collapsed #qFold svg{width:12px;height:12px;}
+.input-folded{
+  display:none;align-items:baseline;gap:4px;min-width:0;max-width:100%;
+  margin:0;padding:0;border:none;background:none;text-align:left;
+  font:inherit;color:var(--txt-2);cursor:pointer;
+}
+.input-folded[hidden]{display:none;}
+.input-folded-k{flex:none;font-size:11px;line-height:1.6;color:var(--txt-3);}
+#qFoldedTxt{
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:12px;line-height:1.6;
+}
+/* 收起态的缩略图（题目摘要右边 / 答案入口右边）：只留图，移除和裁剪按钮隐藏 */
+#qShell.collapsed .thumb,
+.input-thumbs.mini .thumb{width:28px;height:19px;border-radius:4px;}
+#qShell.collapsed .thumb .crop,
+#qShell.collapsed .thumb .x,
+.input-thumbs.mini .thumb .crop,
+.input-thumbs.mini .thumb .x{display:none;}
+.input-thumbs.mini{flex:0 1 auto;flex-wrap:nowrap;gap:5px;max-width:55%;overflow:hidden;padding:0;order:0;align-items:center;}
 #imgTools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:0;}
 #imgTools.idle{display:none;}
 /* 年级 / 图形类型：已移到顶栏，紧挨模型 chip */
@@ -193,6 +252,44 @@ svg.ico-lg{width:18px;height:18px;}
 .count.full{color:var(--danger);font-weight:600;}
 #qWarn{display:none;font-size:12px;color:var(--danger);background:var(--panel)5f5;border:1px solid #ffc9c9;border-radius:7px;padding:6px 10px;}
 #qWarn.show{display:block;}
+/* ---- 未解题先给答案（可选）：折叠时只占一行小字，展开后是一块输入区 ---- */
+.ans-pre{display:flex;flex-direction:column;gap:6px;}
+/* 收起时：入口文字 + 右侧等高缩略图同处一行 */
+.ans-pre-head{display:flex;align-items:center;gap:7px;min-width:0;align-self:stretch;overflow:hidden;}
+.ans-pre-toggle{
+  flex:0 1 auto;min-width:0;max-width:100%;
+  align-self:center;display:inline-flex;align-items:center;gap:3px;
+  margin:0;padding:0 2px;border:none;background:none;cursor:pointer;
+  font:inherit;font-size:12px;line-height:1.6;color:var(--accent);
+  transition:color .12s;text-align:left;
+}
+.ans-pre-toggle:hover{color:var(--accent-h);}
+.ans-pre-toggle .ans-pre-plus{flex:none;font-size:13px;font-weight:600;line-height:1;}
+#ansPreTxt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ans-pre.on .ans-pre-toggle,.ans-pre.filled .ans-pre-toggle{color:var(--accent);}
+/* 展开时缩略图在输入框里，入口右边不再重复 */
+#ansPre.on #ansPreThumbsMini{display:none;}
+.ans-pre-body{display:flex;flex-direction:column;gap:6px;}
+.ans-pre-body[hidden]{display:none;}
+#ansPreIn{
+  display:block;width:100%;box-sizing:border-box;resize:vertical;
+  min-height:58px;max-height:160px;padding:8px 10px;
+  border:none;border-radius:0;background:transparent;
+  font:inherit;font-size:12.5px;line-height:1.6;color:var(--txt);outline:none;
+}
+#ansPreIn:focus{background:transparent;box-shadow:none;}
+#ansPreShell.imgs-only #ansPreIn{height:30px;min-height:30px;padding:3px 10px 5px;resize:none;}
+.ans-pre-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.ans-pre-btn{
+  display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 9px;
+  border:1px solid var(--line);border-radius:7px;background:var(--panel);
+  font:inherit;font-size:11.5px;color:var(--txt-2);cursor:pointer;
+}
+.ans-pre-btn:hover{background:var(--hover);color:var(--accent);border-color:var(--accent);}
+.ans-pre-btn .ico-sm{width:13px;height:13px;}
+.ans-pre-cap{font-size:10.5px;line-height:1.5;color:var(--txt-3);min-width:0;}
+.ans-pre-hint{font-size:10.5px;line-height:1.6;color:var(--txt-3);}
+.ans-pre-hint.warn{color:#8a6321;}
 #thumbs{display:flex;gap:7px;flex-wrap:wrap;}
 .thumb{position:relative;width:44px;height:44px;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--panel-2);flex:none;}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;}
@@ -231,6 +328,9 @@ svg.ico-lg{width:18px;height:18px;}
   transition:.12s;display:inline-flex;align-items:center;justify-content:center;gap:5px;
 }
 #go:hover{background:var(--accent-h);}
+/* 题目收起后，解题键跟着收成一行高，别在旁边留一颗突兀的大按钮 */
+#inputRow.q-collapsed #go{height:32px;width:64px;border-radius:8px;font-size:12.5px;}
+#inputRow.q-collapsed #go .ico{width:13px;height:13px;}
 #go:disabled{background:#c3c3ea;cursor:default;}
 #go svg{width:16px;height:16px;}
 
@@ -1383,10 +1483,14 @@ html[data-theme="dark"] .log-item{border-color:var(--line);}
 .ans-edit-hint{font-size:11px;line-height:1.65;color:var(--txt-3);margin-bottom:6px;letter-spacing:0;}
 .ans-edit textarea{
   display:block;width:100%;box-sizing:border-box;resize:vertical;min-height:64px;max-height:220px;
-  padding:8px 9px;border:1px solid #dfe2ea;border-radius:7px;background:var(--panel);
+  padding:8px 9px;border:none;border-radius:0;background:transparent;
   font:inherit;font-size:12.5px;line-height:1.65;color:var(--txt);outline:none;
 }
-.ans-edit textarea:focus{border-color:#a9b6e8;box-shadow:0 0 0 3px rgba(91,91,214,.08);}
+.ans-edit textarea:focus{box-shadow:none;}
+#ansEditShell:focus-within{border-color:#a9b6e8;box-shadow:0 0 0 3px rgba(91,91,214,.08);background:var(--panel);}
+/* 有图且没补文字：答案截图排到文字行上方，输入框收成一行，长示例占位换成短提示 */
+#ansEditShell.has-imgs .ans-img{order:-1;border-top:none;border-bottom:1px solid var(--line);}
+#ansEditShell.imgs-only #ansEditIn{height:38px;min-height:38px;padding:6px 40px 6px 9px;resize:none;}
 /* 上传答案图片：图标按钮钉在输入框右下角（原来是一颗文字按钮，占一行、手机上太挤） */
 .ans-edit-box{position:relative;}
 .ans-edit-box textarea{padding-right:40px;}
@@ -1402,8 +1506,8 @@ html[data-theme="dark"] .log-item{border-color:var(--line);}
 .ans-edit-actions{display:flex;align-items:center;gap:6px;margin-top:7px;}
 .ans-edit-actions .grow{flex:1 1 auto;}
 .ans-edit-actions .ans-redraw{flex:0 0 auto;white-space:nowrap;}
-/* 答案截图缩略条（粘贴后只挂图，识别发生在点「按此答案重画」时） */
-.ans-img{display:flex;align-items:center;gap:7px;margin-top:7px;padding:5px 6px;border:1px solid var(--line);border-radius:7px;background:var(--panel-2);}
+/* 答案截图缩略条（粘贴后只挂图，识别发生在点「按此答案重画」时）；现在是输入框外壳内的一条底栏 */
+.ans-img{display:flex;align-items:center;gap:7px;margin:0;padding:6px 9px;border:none;border-top:1px solid var(--line);border-radius:0;background:transparent;}
 .ans-img-thumb{width:46px;height:34px;object-fit:cover;border-radius:4px;border:1px solid #e6e9f0;background:var(--panel);flex:0 0 auto;}
 .ans-img-cap{flex:1 1 auto;min-width:0;font-size:10.5px;line-height:1.5;color:var(--txt-3);letter-spacing:0;}
 .ans-img .chat-mini{flex:0 0 auto;white-space:nowrap;}
@@ -1841,6 +1945,20 @@ input[type="checkbox"]:focus-visible{outline:var(--focus-ring);outline-offset:1p
 }
 .hjsel-group:first-child{padding-top:4px;}
 
+/* 历史标签：桌面/手机共用（手机在 mobile.css 里收成单行 + 模型 chip）。
+   放在桌面媒体查询之外，否则 ≤760px 的手机历史拿不到药丸样式。 */
+.hist-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
+.hist-tag{
+  display:inline-flex;align-items:center;gap:4px;height:20px;max-width:100%;padding:0 7px;
+  border:1px solid var(--line-2);border-radius:6px;background:var(--panel);
+  font-size:10.5px;line-height:1;color:var(--txt-3);white-space:nowrap;
+}
+.hist-tag svg{width:11px;height:11px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.hist-tag .tg-t{overflow:hidden;text-overflow:ellipsis;max-width:150px;}
+.hist-tag.grade{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 20%,var(--line));background:var(--accent-2);}
+.hist-tag.model{color:var(--txt-2);}
+.hist-tag.time{font-variant-numeric:tabular-nums;}
+
 /* 以下桌面专属；≤760px 由 mobile.css 接管 */
 @media (min-width:761px){
 /* ---- 2. 弹窗外壳 ---- */
@@ -2012,17 +2130,6 @@ svg.acc-chev{
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
   font-size:13px;font-weight:500;line-height:1.5;color:var(--txt);
 }
-.hist-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
-.hist-tag{
-  display:inline-flex;align-items:center;gap:4px;height:20px;max-width:100%;padding:0 7px;
-  border:1px solid var(--line-2);border-radius:6px;background:var(--panel);
-  font-size:10.5px;line-height:1;color:var(--txt-3);white-space:nowrap;
-}
-.hist-tag svg{width:11px;height:11px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-.hist-tag .tg-t{overflow:hidden;text-overflow:ellipsis;max-width:150px;}
-.hist-tag.grade{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 20%,var(--line));background:var(--accent-2);}
-.hist-tag.model{color:var(--txt-2);}
-.hist-tag.time{font-variant-numeric:tabular-nums;}
 .hist-item .del{
   width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;
   padding:0;border:0;border-radius:8px;background:none;color:var(--txt-3);

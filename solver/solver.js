@@ -195,17 +195,17 @@
   }
 
   var PRESETS = [
-    { name: "— 选择预设 —", base: "", hint: "" },
-    { name: "DeepSeek", base: "https://api.deepseek.com/v1", hint: "deepseek-flash" },
-    { name: "OpenAI", base: "https://api.openai.com/v1", hint: "gpt-4o-mini" },
-    { name: "Kimi (Moonshot)", base: "https://api.moonshot.cn/v1", hint: "moonshot-v1-8k" },
-    { name: "通义千问 (DashScope)", base: "https://dashscope.aliyuncs.com/compatible-mode/v1", hint: "qwen-plus" },
-    { name: "智谱 GLM", base: "https://open.bigmodel.cn/api/paas/v4", hint: "glm-4-flash" },
-    { name: "Groq (免费)", base: "https://api.groq.com/openai/v1", hint: "llama-3.3-70b-versatile" },
-    { name: "OpenRouter", base: "https://openrouter.ai/api/v1", hint: "deepseek/deepseek-chat" },
-    { name: "Google Gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", hint: "gemini-2.0-flash" },
-    { name: "Ollama 本地", base: "http://127.0.0.1:11434/v1", hint: "qwen2.5:7b" },
-    { name: "自定义", base: "", hint: "" }
+    { name: "— 选择预设 —", base: "", hint: "", site: "" },
+    { name: "DeepSeek", base: "https://api.deepseek.com/v1", hint: "deepseek-flash", site: "https://platform.deepseek.com/api_keys" },
+    { name: "OpenAI", base: "https://api.openai.com/v1", hint: "gpt-4o-mini", site: "https://platform.openai.com/api-keys" },
+    { name: "Kimi (Moonshot)", base: "https://api.moonshot.cn/v1", hint: "moonshot-v1-8k", site: "https://platform.moonshot.cn/console/api-keys" },
+    { name: "通义千问 (DashScope)", base: "https://dashscope.aliyuncs.com/compatible-mode/v1", hint: "qwen-plus", site: "https://bailian.console.aliyun.com/" },
+    { name: "智谱 GLM", base: "https://open.bigmodel.cn/api/paas/v4", hint: "glm-4-flash", site: "https://open.bigmodel.cn/usercenter/apikeys" },
+    { name: "Groq (免费)", base: "https://api.groq.com/openai/v1", hint: "llama-3.3-70b-versatile", site: "https://console.groq.com/keys" },
+    { name: "OpenRouter", base: "https://openrouter.ai/api/v1", hint: "deepseek/deepseek-chat", site: "https://openrouter.ai/keys" },
+    { name: "Google Gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", hint: "gemini-2.0-flash", site: "https://aistudio.google.com/app/apikey" },
+    { name: "Ollama 本地", base: "http://127.0.0.1:11434/v1", hint: "qwen2.5:7b", site: "https://ollama.com/download" },
+    { name: "自定义", base: "", hint: "", site: "" }
   ];
 
   var modelOptions = [];
@@ -378,7 +378,7 @@
   function setModelOptions(ids) { modelOptions = ids.slice(); }
 
   var presetSel = $("fPreset");
-  PRESETS.forEach(function (p, i) { var o = document.createElement("option"); o.value = String(i); o.textContent = p.name; presetSel.appendChild(o); });
+  PRESETS.forEach(function (p, i) { var o = document.createElement("option"); o.value = String(i); o.textContent = p.name; o.dataset.site = p.site || ""; presetSel.appendChild(o); });
   presetSel.onchange = function () {
     var p = PRESETS[Number(presetSel.value)];
     if (!p) return;
@@ -537,6 +537,8 @@
   var images = [];
   var imgOriginals = Object.create(null);   // 裁剪后的图 → 原图，支持反复从原图重裁
   var PENDING = null;                       // 拍照/相册暂存图：确认前不进 images
+  var qPhBeforeImg = null;
+  var qCollapsed = false;                   // 题目框收起：只留一行摘要 + 缩略图
   function rememberImage(src, original) { if (src) imgOriginals[src] = original || src; }
   function originalOf(src) { return imgOriginals[src] || src; }
   function resetImages(list) {
@@ -563,12 +565,53 @@
       d.appendChild(x); t.appendChild(d);
     });
     syncImgTools();
+    syncQShell();
   }
-  // 输入区这一行只在「有题图 / 有进行中的任务」时出现，避免 idle 时多占 8px 间距
+  // 有图时把题目框收成一行「补充文字」：长示例占位会让空 textarea 白占一块高度，
+  // 叠在缩略图上把顶部输入区撑高、挤压画布。图片本身就是输入内容。
+  function syncQShell() {
+    var shell = $("qShell"), q = $("q");
+    if (!shell || !q) return;
+    var has = images.length > 0;
+    shell.classList.toggle("has-imgs", has);
+    shell.classList.toggle("imgs-only", has && !q.value.trim());
+    // 只替换/还原占位：进入有图态时记下当前文案，移除图片时原样还回去
+    if (has) {
+      if (qPhBeforeImg === null) qPhBeforeImg = q.getAttribute("placeholder") || "";
+      q.setAttribute("placeholder", "可补充题目文字（可选）");
+    } else if (qPhBeforeImg !== null) {
+      q.setAttribute("placeholder", qPhBeforeImg);
+      qPhBeforeImg = null;
+    }
+    syncQFold();
+  }
+  // 题目收起键：收起后文本还在，只是换成一行摘要；图片始终留在外壳里，点图照样看大图
+  function syncQFold() {
+    var shell = $("qShell"), btn = $("qFold"), box = $("qFolded"), txt = $("qFoldedTxt");
+    if (!shell || !btn) return;
+    shell.classList.toggle("collapsed", qCollapsed);
+    if ($("inputRow")) $("inputRow").classList.toggle("q-collapsed", qCollapsed);
+    btn.setAttribute("aria-expanded", qCollapsed ? "false" : "true");
+    btn.setAttribute("aria-label", qCollapsed ? "展开题目" : "收起题目");
+    btn.title = qCollapsed ? "展开题目" : "收起题目";
+    if (box) box.hidden = !qCollapsed;
+    if (txt) {
+      var v = String(($("q") && $("q").value) || "").replace(/\s+/g, " ").trim();
+      txt.textContent = v || (images.length ? "图片题目" : "输入题目");
+    }
+  }
+  function setQFold(on, focus) {
+    qCollapsed = !!on;
+    syncQFold();
+    if (!qCollapsed && focus && !isMobileUI()) {
+      try { $("q").focus(); } catch (e) {}
+    }
+  }
+  // 缩略图已经移进输入框外壳；这一行现在只剩进度条，只有任务进行中才占位
   function syncImgTools() {
     var tools = $("imgTools"), pg = $("imgProgress");
     if (!tools) return;
-    tools.classList.toggle("idle", !images.length && !(pg && pg.classList.contains("on")));
+    tools.classList.toggle("idle", !(pg && pg.classList.contains("on")));
   }
   function openLightbox(src) { $("lightboxImg").src = src; $("lightbox").classList.add("show"); }
   function closeLightbox() { $("lightbox").classList.remove("show"); $("lightboxImg").src = ""; }
@@ -842,7 +885,9 @@
           rememberImage(u, src);
           renderThumbs();
           qWarn("");
-          if (window.HJ && HJ.toast) HJ.toast("已加入题目图片，可以继续框选或点「解题」", "ok");
+          if (window.HJ && HJ.toast) HJ.toast(isMobileUI()
+            ? "题目图已加入。有答案图就先上传，没有就直接点「解题」"
+            : "已加入题目图片，可以继续框选或点「解题」", "ok");
         } else {
           if (!images[idx]) { $("cropMsg").textContent = "这张图已经不在了"; return; }
           images[idx] = u;
@@ -852,6 +897,15 @@
           if (window.HJ && HJ.toast) HJ.toast("已换成裁剪后的图片，点「解题」用新图重新解", "ok");
         }
         cropClose();
+        if (pending) {
+          // 手机端收到这个事件后只回首页，等用户决定要不要补答案图；
+          // 不能在这里直接解题，否则用户没机会上传答案图片。
+          setTimeout(function () {
+            try {
+              document.dispatchEvent(new CustomEvent("hj-question-image-added", { detail: { src: u } }));
+            } catch (e) {}
+          }, 0);
+        }
       }
       if (whole) { commit(src); return; }
       var cv = document.createElement("canvas");
@@ -1176,8 +1230,8 @@
     body.addEventListener("drop", function (e) {
       var fs = (e.dataTransfer && e.dataTransfer.files) || [];
       if (!fs.length) return;
-      // 题目输入框自己有 drop 处理，这里只在"非输入框"区域接管
-      var inQ = e.target && e.target.closest && e.target.closest("#q");
+      // 题目输入框（含缩略图外壳）自己有 drop 处理，这里只在「非输入框」区域接管
+      var inQ = e.target && e.target.closest && e.target.closest("#qShell, #q");
       depth = 0; show(false);
       var jsons = [], htmls = [], imgs = [];
       for (var i = 0; i < fs.length; i++) {
@@ -1188,7 +1242,7 @@
       }
       if (!jsons.length && !htmls.length && !imgs.length) return;
       if (jsons.length || htmls.length) e.preventDefault();
-      imgs.forEach(function (f) { if (window.SolverDebug && SolverDebug.addImageFile) SolverDebug.addImageFile(f); });
+      if (!inQ) imgs.forEach(function (f) { if (window.SolverDebug && SolverDebug.addImageFile) SolverDebug.addImageFile(f); });
       if (!jsons.length && !htmls.length) return;
       // 逐个读文件、合并后统一导入（.json 直接解析；导出的 .html 提取内嵌记录）
       var files = jsons.map(function (f) { return { f: f, html: false }; })
@@ -1376,9 +1430,25 @@
       meta.appendChild(qt);
       var subText = fmtTime(rec.ts) + (rec.model ? " · " + rec.model : "") + (rec.grade ? " · " + rec.grade : "") + (rec.imgCount ? " · " + rec.imgCount + " 图" : "") + (rec.chatCount ? " · 追问 " + rec.chatCount + " 条" : "") + (rec.elapsedMs != null ? " · " + (rec.elapsedMs / 1000).toFixed(1) + "s" : "") + (rec.usage && rec.usage.total_tokens != null ? " · " + rec.usage.total_tokens + " tok" : "") + (rec.cost ? " · " + rec.cost : "") + (rec.verCount > 1 ? " · " + rec.verCount + " 版" : (rec.refined ? " · 已微调" : ""));
       if (mob) {
-        var sub = document.createElement("div"); sub.className = "sub";
-        sub.textContent = subText;
-        meta.appendChild(sub);
+        // 手机端：沿用桌面标签的样式（小药丸 + 图标），但不换行，
+        // 行高由固定的 20px 标签撑住，避免把历史条目加高。
+        it.title = subText;
+        if (rec.model) {
+          // 模型名挪到缩略图左上角：绝对定位在卡片顶部留白里，
+          // 不盖住图片，也不参与 flex 布局（因此不影响条目高度）。
+          var mp = histTag('<use href="#i-sparkles"/>', rec.model, "model hist-model");
+          it.appendChild(mp);
+        }
+        var tags = document.createElement("div"); tags.className = "hist-tags m-tags";
+        tags.appendChild(histTag('<use href="#i-history"/>', histTimeShort(rec.ts), "time"));
+        if (rec.grade) tags.appendChild(histTag(HIST_ICON_GRADE, rec.grade, "grade"));
+        if (rec.imgCount) tags.appendChild(histTag('<use href="#i-image"/>', rec.imgCount + " 图"));
+        if (rec.chatCount) tags.appendChild(histTag(HIST_ICON_CHAT, "追问 " + rec.chatCount));
+        if (rec.elapsedMs != null) tags.appendChild(histTag(HIST_ICON_CLOCK, (rec.elapsedMs / 1000).toFixed(1) + "s"));
+        if (rec.verCount > 1) tags.appendChild(histTag('<use href="#i-layers"/>', rec.verCount + " 版"));
+        else if (rec.refined) tags.appendChild(histTag('<use href="#i-wand-2"/>', "已微调"));
+        if (rec.cost) tags.appendChild(histTag(HIST_ICON_COST, rec.cost));
+        meta.appendChild(tags);
       } else {
         it.title = subText;
         var tags = document.createElement("div"); tags.className = "hist-tags";
@@ -1713,16 +1783,27 @@
   }
   function addImageBlob(blob) { if (blob) addImageFile(new File([blob], "paste.png", { type: blob.type || "image/png" })); }
 
-  $("q").addEventListener("input", function () { updCount(); });
+  $("q").addEventListener("input", function () { updCount(); syncQShell(); });
+  if ($("qFold")) $("qFold").addEventListener("click", function (e) {
+    e.stopPropagation();
+    setQFold(!qCollapsed, true);
+  });
+  if ($("qFolded")) $("qFolded").addEventListener("click", function () { setQFold(false, true); });
   $("q").addEventListener("paste", function (e) {
     var items = (e.clipboardData && e.clipboardData.items) || [];
     var got = false;
     for (var i = 0; i < items.length; i++) if (items[i].type && items[i].type.indexOf("image") === 0) { addImageBlob(items[i].getAsFile()); got = true; }
     if (got) e.preventDefault();
   });
-  ["dragover", "dragenter"].forEach(function (ev) { $("q").addEventListener(ev, function (e) { e.preventDefault(); $("q").classList.add("drop"); }); });
-  ["dragleave", "drop"].forEach(function (ev) { $("q").addEventListener(ev, function (e) { e.preventDefault(); $("q").classList.remove("drop"); }); });
-  $("q").addEventListener("drop", function (e) {
+  // 拖拽高亮画在输入框外壳上；缩略图条也在外壳里，拖到图上同样能接住
+  var qDrop = $("qShell") || $("q");
+  ["dragover", "dragenter"].forEach(function (ev) { qDrop.addEventListener(ev, function (e) { e.preventDefault(); qDrop.classList.add("drop"); }); });
+  qDrop.addEventListener("dragleave", function (e) {
+    if (e.relatedTarget && qDrop.contains(e.relatedTarget)) return;
+    qDrop.classList.remove("drop");
+  });
+  qDrop.addEventListener("drop", function (e) {
+    e.preventDefault(); qDrop.classList.remove("drop");
     var fs = (e.dataTransfer && e.dataTransfer.files) || [];
     for (var i = 0; i < fs.length; i++) addImageFile(fs[i]);
   });
@@ -2172,6 +2253,15 @@
     return cropOpen(images.length - 1);
   };
   window.HJ._cropPending = function () { return cropOpenPending(); };
+  // 手机端「用这张」回到首页后，把可选的答案区展开给用户看；不聚焦，避免一回来就弹键盘。
+  window.HJ._ansPreReveal = function () {
+    ansPreOpen(false);
+    var box = $("ansPre");
+    if (box && box.scrollIntoView) {
+      try { box.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {}
+    }
+    return true;
+  };
   window.HJ._stageImage = function (file, allowSmall, from) { return stageImageFile(file, allowSmall, from); };
   window.HJ._discardPending = discardPending;
   window.HJ._plain = texPlainText;
@@ -3489,6 +3579,7 @@
   var ansEditScope = null;
   var ansEditInit = "";       // 打开编辑器时的初始文本
   var ansEditImg = "";        // 已附加的答案截图（dataURL），点「按此答案重画」时才随请求发给模型
+  var ansEditPhBeforeImg = null;
   function ansEditIsOpen() { var b = $("ansEdit"); return !!(b && b.style.display !== "none"); }
   function ansEditClose() {
     ansEditScope = null;
@@ -3516,6 +3607,22 @@
     } else {
       th.removeAttribute("src");
       box.style.display = "none";
+    }
+    syncAnsEditShell();
+  }
+  // 和题目框、答案框同一口径：有图且无文字时收起长示例占位，别让空白把答案区撑高
+  function syncAnsEditShell() {
+    var shell = $("ansEditShell"), ta = $("ansEditIn");
+    if (!shell || !ta) return;
+    var has = !!ansEditImg;
+    shell.classList.toggle("has-imgs", has);
+    shell.classList.toggle("imgs-only", has && !ta.value.trim());
+    if (has) {
+      if (ansEditPhBeforeImg === null) ansEditPhBeforeImg = ta.getAttribute("placeholder") || "";
+      ta.setAttribute("placeholder", "可补充答案文字（可选）");
+    } else if (ansEditPhBeforeImg !== null) {
+      ta.setAttribute("placeholder", ansEditPhBeforeImg);
+      ansEditPhBeforeImg = null;
     }
   }
   function ansImgClear() {
@@ -3578,7 +3685,7 @@
     if (!r || !r.givenAnswer) { n.style.display = "none"; n.innerHTML = ""; return; }
     var where = (r.givenScope === "current" && r.givenQuestionIndex >= 0)
       ? "第 (" + (r.givenQuestionIndex + 1) + ") 问"
-      : (r.givenScope === "option" && r.givenOption ? "选项 " + r.givenOption : "整题");
+      : (r.givenScope === "option" && r.givenOption ? "选项 " + r.givenOption : (r.givenAtSolve ? "" : "整题"));
     // 答案来自截图时，说明「这张图识别出了什么」，用户才知道 AI 到底按什么在重画
     var from = r.givenFromImage ? "你上传的答案图片" : ("你给的" + where + "答案");
     var ocr = (r.givenFromImage && r.givenAnswerText)
@@ -3593,7 +3700,7 @@
       head = from + "与题设不一致，已按验算结果修正。";
     } else {
       n.className = "ans-note ok";
-      head = "已按" + from + "重画图形。";
+      head = "已按" + from + (r.givenAtSolve ? "生成图形与解析。" : "重画图形。");
     }
     n.innerHTML = head + note + ocr;
     n.style.display = "block";
@@ -3639,6 +3746,7 @@
   };
   if ($("ansRedraw")) $("ansRedraw").onclick = redrawWithAnswer;
   if ($("ansEditIn")) {
+    $("ansEditIn").addEventListener("input", syncAnsEditShell);
     $("ansEditIn").addEventListener("keydown", function (e) {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); redrawWithAnswer(); }
     });
@@ -4125,6 +4233,8 @@
     }
     if (!isUpdate) {
       commitPending();
+      // 按答案首解成功：输入区的答案已被这次请求消费掉，清空避免下一题误用
+      if (r && r.givenAtSolve) ansPreReset();
       var qTxt = (entry && entry.qFull != null) ? entry.qFull : $("q").value.trim();
       // 图片以提交任务时为准；页面刷新后恢复的任务没有图片副本，退回当前输入框里的图片
       var imgs = (entry && entry.images && entry.images.length) ? entry.images.slice() : images.slice();
@@ -4148,6 +4258,11 @@
         style2d: r.style2d || null,
         figureBox: r.figureBox || null,
         steps: r.steps || null, controls: r.controls || null, focusTargets: r.focusTargets || null, subQuestions: r.subQuestions || null,
+        // 按答案首解：溯源字段要落到记录顶层，重开记录时答案卡旁仍能看到「按你给的答案生成」
+        givenAnswer: r.givenAnswer || "", givenAtSolve: r.givenAtSolve === true,
+        givenScope: r.givenScope || "", givenQuestionIndex: (typeof r.givenQuestionIndex === "number" ? r.givenQuestionIndex : -1),
+        givenFromImage: r.givenFromImage === true, givenAnswerText: r.givenAnswerText || "",
+        answerAdjusted: r.answerAdjusted === true, answerNote: r.answerNote || "",
         versions: r.versions, currentVid: r.currentVid,
         chat: r.chat || [],
         promptVer: r.promptVer || "", promptHash: r.promptHash || "", promptChannel: r.promptChannel || "", promptBytes: r.promptBytes || null,
@@ -4517,9 +4632,23 @@
   if ($("view")) $("view").addEventListener("change", function () { viewSave(viewGet()); });
   viewLoad();
 
-  // 夜间模式：只换界面外壳，画布仍是白纸（图形颜色是按白底设计的）。
-  // 首次进页面由 index.html <head> 里的内联脚本先定主题，这里只负责按钮与图标。
+  // 主题：日间 / 夜间 / 跟随系统（auto）。只换界面外壳，画布仍是白纸（图形颜色是按白底设计的）。
+  // 首次进页面由 index.html <head> 里的内联脚本先定主题，这里负责按钮、图标与偏好读写。
   var THEME_KEY = "solver_theme_v1";
+  var themeMQL = null;
+  try { themeMQL = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null; } catch (e) {}
+  function themeMode() {
+    try {
+      var v = localStorage.getItem(THEME_KEY);
+      return v === "dark" || v === "light" ? v : "auto";
+    } catch (e) { return "auto"; }
+  }
+  function systemTheme() {
+    try { return themeMQL && themeMQL.matches ? "dark" : "light"; } catch (e) { return "light"; }
+  }
+  function themeResolve(mode) {
+    return mode === "auto" ? systemTheme() : (mode === "dark" ? "dark" : "light");
+  }
   function themeGet() { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
   function themeApply(t) {
     document.documentElement.setAttribute("data-theme", t);
@@ -4531,7 +4660,20 @@
     // themeToggle 走 View Transition 时本函数在下一帧才执行；任何「点完立刻读
     // data-theme」的调用方（手机设置页）都会读到旧值、把切换方向弄反——
     // 统一广播，让它们监听这个事件再刷新自己的选中态
-    try { document.dispatchEvent(new CustomEvent("hj-themechange", { detail: { theme: t } })); } catch (e) {}
+    try { document.dispatchEvent(new CustomEvent("hj-themechange", { detail: { theme: t, mode: themeMode() } })); } catch (e) {}
+  }
+  function themeSetMode(mode) {
+    mode = (mode === "dark" || mode === "light") ? mode : "auto";
+    try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
+    themeApply(themeResolve(mode));
+    return mode;
+  }
+  // 跟随系统时，系统深浅色变化（或从后台回来）要重新解析一次；
+  // 用户选的是日间/夜间就完全不动。
+  function themeFollowSystem() {
+    if (themeMode() !== "auto") return;
+    var t = themeResolve("auto");
+    if (themeGet() !== t) themeApply(t);
   }
   function themeToggle() {
     var t = themeGet() === "dark" ? "light" : "dark";
@@ -4554,6 +4696,16 @@
   }
   if ($("btnTheme")) $("btnTheme").addEventListener("click", themeToggle);
   themeApply(themeGet());
+  if (themeMQL) {
+    if (themeMQL.addEventListener) themeMQL.addEventListener("change", themeFollowSystem);
+    else if (themeMQL.addListener) themeMQL.addListener(themeFollowSystem);
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) themeFollowSystem(); });
+  if (window.HJ) {
+    window.HJ._themeMode = themeMode;
+    window.HJ._themeResolve = themeResolve;
+    window.HJ._themeSetMode = themeSetMode;
+  }
 
   // 失败时的重试按钮：只在顶层「解题」失败后出现，点一下用同一题重新请求。
   // 不放在提示文字里，是因为手机上那句 hint 很容易被当成普通说明直接划过去。
@@ -4594,6 +4746,144 @@
     $("analysis").textContent = logHintText(hint || "重试一次");
     retryShow(true);
   }
+  // ================= 未解题先给答案（可选） =================
+  // 与「改答案 → 按此答案重画」共用同一套服务端口径（【用户给定答案】+【给定答案使用规则】），
+  // 区别只有一个：这里没有旧答案/旧图可参照，属于「按答案首解」。
+  var ansPreImg = "";            // 答案截图（dataURL），点「解题」时随请求发出
+  var ansPrePhBeforeImg = null;
+  function ansPreIsOpen() { var b = $("ansPreBody"); return !!(b && !b.hidden); }
+  function ansPreVal() { return String(($("ansPreIn") && $("ansPreIn").value) || "").trim(); }
+  function ansPreHint(msg) {
+    var t = $("ansPreHint"); if (!t) return;
+    t.textContent = msg || "按你给的答案画图、写解析；若与题设冲突，以验算结果为准，并在答案旁提示你。";
+    t.className = "ans-pre-hint" + (msg ? " warn" : "");
+  }
+  // 答案截图缩略图挂进输入框外壳；收起时同一张图还会出现在入口文字右边
+  var ansPreThumbSrc = null;
+  function ansPreThumbNode(src) {
+    var d = document.createElement("div"); d.className = "thumb";
+    var im = document.createElement("img"); im.src = src; im.alt = "答案截图"; im.title = "点开放大";
+    im.onclick = function (e) { e.stopPropagation(); openLightbox(src); };
+    d.appendChild(im);
+    var x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "移除答案截图";
+    x.onclick = function (e) {
+      e.stopPropagation();
+      ansPreImg = "";
+      ansPreHint("");
+      ansPreSync();
+    };
+    d.appendChild(x);
+    return d;
+  }
+  function ansPreRenderThumb() {
+    var boxes = [$("ansPreThumbs"), $("ansPreThumbsMini")];
+    if (!boxes[0] && !boxes[1]) return;
+    if (ansPreThumbSrc === ansPreImg) return;
+    ansPreThumbSrc = ansPreImg;
+    boxes.forEach(function (box) {
+      if (!box) return;
+      box.innerHTML = "";
+      if (ansPreImg) box.appendChild(ansPreThumbNode(ansPreImg));
+    });
+  }
+  // 和题目框同一口径：有答案图就让图片当主角，长示例占位换成一行补充说明
+  function syncAnsPreShell() {
+    var shell = $("ansPreShell"), ta = $("ansPreIn");
+    if (!shell || !ta) return;
+    var has = !!ansPreImg;
+    shell.classList.toggle("has-imgs", has);
+    shell.classList.toggle("imgs-only", has && !ta.value.trim());
+    // 与题目框同一套：只换有图时的占位，移除图片时还原（保留手机端换过的文案）
+    if (has) {
+      if (ansPrePhBeforeImg === null) ansPrePhBeforeImg = ta.getAttribute("placeholder") || "";
+      ta.setAttribute("placeholder", "可补充答案文字（可选）");
+    } else if (ansPrePhBeforeImg !== null) {
+      ta.setAttribute("placeholder", ansPrePhBeforeImg);
+      ansPrePhBeforeImg = null;
+    }
+  }
+  function ansPreSync() {
+    var box = $("ansPre"), txt = $("ansPreTxt"), tg = $("ansPreToggle"), cap = $("ansPreCap");
+    if (!box) return;
+    var v = ansPreVal(), has = !!(v || ansPreImg), open = ansPreIsOpen();
+    box.classList.toggle("filled", has);
+    box.classList.toggle("on", open);
+    if (tg) tg.setAttribute("aria-expanded", open ? "true" : "false");
+    if (txt) {
+      if (has) {
+        var head = v ? (v.replace(/\s+/g, " ").slice(0, 18) + (v.length > 18 ? "…" : "")) : "";
+        txt.textContent = v ? ("已填答案：" + head) : "已附答案截图";
+      } else {
+        txt.textContent = open ? "收起答案" : "已有答案？先填上（可选）";
+      }
+    }
+    if (cap) cap.textContent = ansPreImg ? "已附答案截图，点「解题」时由 AI 识别" : "";
+    ansPreRenderThumb();
+    syncAnsPreShell();
+  }
+  function ansPreOpen(focus) {
+    var b = $("ansPreBody"); if (!b) return;
+    b.hidden = false; ansPreSync();
+    if (focus === false) return;
+    setTimeout(function () {
+      try { $("ansPreIn").focus({ preventScroll: true }); }
+      catch (e) { try { $("ansPreIn").focus(); } catch (e2) {} }
+    }, 0);
+  }
+  function ansPreClose() { var b = $("ansPreBody"); if (b) b.hidden = true; ansPreSync(); }
+  function ansPreReset() {
+    if ($("ansPreIn")) $("ansPreIn").value = "";
+    ansPreImg = "";
+    ansPreHint("");
+    ansPreClose();
+  }
+  // 答案截图：与改答案区同一条链路（FileReader → fitImage 压缩 → dataURL 挂着），
+  // 识别发生在点「解题」之后，由模型读图。
+  function ansPreBlob(blob) {
+    if (!blob) return;
+    if (blob.size < IMG_MIN) { ansPreHint("图片过小（不足 10KB），可能是误截图，请重新截图"); return; }
+    if (blob.size > IMG_MAX) { ansPreHint("图片过大（超过 20MB），请压缩后再试"); return; }
+    var fr = new FileReader();
+    fr.onload = function () {
+      var u = String(fr.result || "");
+      if (!/^data:image\/(png|jpeg|webp)/.test(u)) { ansPreHint("仅支持 JPG、PNG、WebP 格式的图片"); return; }
+      fitImage(u, function (dataUrl) { ansPreImg = dataUrl; ansPreHint(""); ansPreSync(); });
+    };
+    fr.readAsDataURL(blob);
+  }
+  function ansPrePickFile() {
+    var inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*"; inp.style.display = "none";
+    inp.addEventListener("change", function () {
+      var f = inp.files && inp.files[0];
+      if (inp.parentNode) inp.parentNode.removeChild(inp);
+      if (f) ansPreBlob(f);
+    });
+    document.body.appendChild(inp);
+    inp.click();
+  }
+  (function () {
+    if ($("ansPreToggle")) $("ansPreToggle").onclick = function () { if (ansPreIsOpen()) ansPreClose(); else ansPreOpen(); };
+    if ($("ansPrePick")) $("ansPrePick").onclick = ansPrePickFile;
+    if ($("ansPreClear")) $("ansPreClear").onclick = function () { ansPreReset(); ansPreOpen(); };
+    if ($("ansPreIn")) {
+      $("ansPreIn").addEventListener("input", function () { ansPreHint(""); ansPreSync(); });
+      $("ansPreIn").addEventListener("keydown", function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); solve(); }
+      });
+      // 粘贴图片：Ctrl+V 与右键菜单「粘贴」都会触发 paste（手机端没有 Ctrl+V，走上传按钮）
+      $("ansPreIn").addEventListener("paste", function (e) {
+        var items = (e.clipboardData && e.clipboardData.items) || [];
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].type && items[i].type.indexOf("image") === 0) {
+            e.preventDefault(); ansPreBlob(items[i].getAsFile()); return;
+          }
+        }
+      });
+    }
+    ansPreSync();
+  })();
+
   function solve() {
     var q = $("q").value.trim();
     if (!q && !images.length) { window.HJFX && HJFX.shake($("q")); return; }   // 空输入：抖一下提示，不聚焦
@@ -4601,9 +4891,21 @@
     if (q.length > Q_MAX) { qWarn("题目过长，最多 " + Q_MAX + " 字"); return; }
     var be = q ? badInput(q) : "";
     if (be) { qWarn(be); $("q").focus(); return; }
+    // 未解题先给的答案（可选）：和题目一起提交，服务端按【给定答案使用规则】验算后画图、写解析。
+    var given = ansPreVal();
+    if (given) {
+      if (given.length > ANS_EDIT_MAX) { ansPreHint("答案过长，最多 " + ANS_EDIT_MAX + " 字"); ansPreOpen(); return; }
+      var ge = badInput(given);
+      if (ge) { ansPreHint(ge); ansPreOpen(); return; }
+    }
     var cfg = loadCfg();
     if (!cfg || !cfg.baseUrl || !cfg.apiKey) { openModal(); $("cfgMsg").className = "msg bad"; $("cfgMsg").textContent = "请先配置模型"; return; }
-    runTask("/api/solve", { question: q, images: images.slice(), grade: gradeGet(), dim: dimGet(), view: viewGet(), config: cfg, stream: true }, "解题", { update: false, auto: false });
+    var body = { question: q, images: images.slice(), grade: gradeGet(), dim: dimGet(), view: viewGet(), config: cfg, stream: true };
+    if (given) body.givenAnswer = given;
+    if (ansPreImg) body.answerImages = [ansPreImg];
+    // 提交后收起答案区：给画布/答案腾地方；失败时内容仍在，可直接重试
+    ansPreClose();
+    runTask("/api/solve", body, (given || ansPreImg) ? "按答案解题" : "解题", { update: false, auto: false });
   }
   $("go").onclick = solve;
   $("q").addEventListener("keydown", function (e) { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") solve(); });

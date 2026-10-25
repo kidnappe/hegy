@@ -9,21 +9,23 @@
 <link rel="icon" type="image/png" sizes="256x256" href="assets/icon-256.png" />
 <link rel="stylesheet" href="vendor/jsxgraph.css" />
 <link rel="stylesheet" href="vendor/katex/katex.min.css" />
-<link rel="stylesheet" href="ui.css?v=20261025d" />
+<link rel="stylesheet" href="ui.css?v=20261026a" />
 <link rel="stylesheet" href="skins.css?v=20261024e" />
 <script>
 /* 主题与皮肤要在首帧前定下来，否则会闪一下白底（口径见 SKIN-SYSTEM.md §3.3）。
-   三套皮肤都支持日间/夜间（P6 起 03/04 夜间为单独设计）；data-theme 只跟用户偏好走。 */
+   三套皮肤都支持日间/夜间（P6 起 03/04 夜间为单独设计）；
+   主题偏好 light / dark / auto（跟随系统），data-theme 只放解析后的明暗。 */
 (function () {
   try {
     var allowed = ["default", "warm", "swiss"];
     var skin = localStorage.getItem("solver_skin_v1");
     if (allowed.indexOf(skin) < 0) skin = "default";
 
-    var theme = localStorage.getItem("solver_theme_v1");
-    if (theme !== "dark" && theme !== "light") {
-      theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    }
+    var mode = localStorage.getItem("solver_theme_v1");
+    if (mode !== "dark" && mode !== "light") mode = "auto";
+    var theme = mode === "auto"
+      ? (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : mode;
     document.documentElement.setAttribute("data-skin", skin);
     document.documentElement.setAttribute("data-theme", theme);
   } catch (e) {}
@@ -76,9 +78,45 @@
   <!-- ============ 题目输入 ============ -->
   <div id="inputRow">
     <div id="inputCol">
-      <textarea id="q" maxlength="1000" rows="2" placeholder="粘贴/输入题目，例如：如图，在 Rt△ABC 中，∠C=90°，AC=3，BC=4，D 为 AB 中点，求 CD 的长。"></textarea>
+      <!-- 题目框外壳：缩略图放在输入框内部（有图时排在文字行上方），边框和焦点态都交给外壳 -->
+      <div class="input-shell" id="qShell">
+        <div class="input-shell-field">
+          <textarea id="q" maxlength="1000" rows="2" placeholder="粘贴/输入题目，例如：如图，在 Rt△ABC 中，∠C=90°，AC=3，BC=4，D 为 AB 中点，求 CD 的长。"></textarea>
+        </div>
+        <!-- 收起后只留一行题目摘要，缩略图贴在摘要右边（点图看大图） -->
+        <button type="button" id="qFolded" class="input-folded" title="展开题目" hidden>
+          <span class="input-folded-k">题目</span><span id="qFoldedTxt"></span>
+        </button>
+        <div id="thumbs" class="input-thumbs"></div>
+        <button type="button" id="qFold" class="input-fold" title="收起题目" aria-expanded="true" aria-controls="q">
+          <svg class="ico-sm" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
+      <!-- 未解题先给答案（可选）：填了就以它为求解目标画图、写解析；不填照常解题 -->
+      <div id="ansPre" class="ans-pre">
+        <div class="ans-pre-head">
+          <button type="button" id="ansPreToggle" class="ans-pre-toggle" aria-expanded="false" aria-controls="ansPreBody">
+            <span class="ans-pre-plus" aria-hidden="true">＋</span><span id="ansPreTxt">已有答案？先填上（可选）</span>
+          </button>
+          <!-- 收起时答案缩略图仍挂在文字右边；展开后由输入框内的缩略条显示 -->
+          <div id="ansPreThumbsMini" class="input-thumbs mini"></div>
+        </div>
+        <div class="ans-pre-body" id="ansPreBody" hidden>
+          <div class="input-shell" id="ansPreShell">
+            <textarea id="ansPreIn" rows="2" maxlength="4000" placeholder="把正确答案写在这里，例如：∠DFE=10°；多小问可写 (1)… (2)…；也可以粘贴或上传答案截图"></textarea>
+            <div id="ansPreThumbs" class="input-thumbs"></div>
+          </div>
+          <div class="ans-pre-acts">
+            <button type="button" id="ansPrePick" class="ans-pre-btn" title="上传答案截图">
+              <svg class="ico-sm"><use href="#i-image"/></svg><span id="ansPrePickTxt">上传截图</span>
+            </button>
+            <button type="button" id="ansPreClear" class="ans-pre-btn">清除</button>
+            <span id="ansPreCap" class="ans-pre-cap"></span>
+          </div>
+          <div class="ans-pre-hint" id="ansPreHint">按你给的答案画图、写解析；若与题设冲突，以验算结果为准，并在答案旁提示你。</div>
+        </div>
+      </div>
       <div id="imgTools" class="idle">
-        <div id="thumbs"></div>
         <!-- 输入区主进度条：贴在题图/图片选择框右侧的空白处，状态栏的小进度条仍保留 -->
         <div id="imgProgress" role="progressbar" aria-label="任务进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div class="ip-row">
@@ -220,13 +258,17 @@
           <div class="ans-edit" id="ansEdit" style="display:none">
             <div class="ans-edit-hint" id="ansEditHint"></div>
             <div class="ans-edit-box">
-              <textarea id="ansEditIn" rows="3" maxlength="4000" placeholder="把正确答案写在这里，例如：∠DFE=10°；多小问可写 (1)… (2)…；也可以粘贴或上传答案截图"></textarea>
-              <button class="ans-img-pick" id="ansImgPick" type="button" title="上传答案图片" aria-label="上传答案图片"><svg class="ico"><use href="#i-image"/></svg></button>
-            </div>
-            <div class="ans-img" id="ansImgBox" style="display:none">
-              <img class="ans-img-thumb" id="ansImgThumb" alt="答案截图" />
-              <span class="ans-img-cap">已附加答案截图，点重画时由 AI 识别</span>
-              <button class="chat-mini" id="ansImgDel" type="button">移除</button>
+              <div class="input-shell" id="ansEditShell">
+                <div class="input-shell-field">
+                  <textarea id="ansEditIn" rows="3" maxlength="4000" placeholder="把正确答案写在这里，例如：∠DFE=10°；多小问可写 (1)… (2)…；也可以粘贴或上传答案截图"></textarea>
+                  <button class="ans-img-pick" id="ansImgPick" type="button" title="上传答案图片" aria-label="上传答案图片"><svg class="ico"><use href="#i-image"/></svg></button>
+                </div>
+                <div class="ans-img" id="ansImgBox" style="display:none">
+                  <img class="ans-img-thumb" id="ansImgThumb" alt="答案截图" />
+                  <span class="ans-img-cap">已附加答案截图，点重画时由 AI 识别</span>
+                  <button class="chat-mini" id="ansImgDel" type="button">移除</button>
+                </div>
+              </div>
             </div>
             <div class="ans-img-hint" id="ansImgHint" style="display:none"></div>
             <div class="ans-edit-actions">
@@ -603,9 +645,9 @@
 <script src="vendor3d/OrbitControls.js"></script>
 <script src="vendor3d/render3d.js?v=20261024e"></script>
 <script src="shim.js"></script>
-<script src="skins.js?v=20261024e"></script>
+<script src="skins.js?v=20261025e"></script>
 <script src="ui.js?v=20261025a"></script>
-<script src="solver.js?v=20261025b"></script>
+<script src="solver.js?v=20261026a"></script>
 <script src="about.js?v=20261025c"></script>
 </body>
 </html>
