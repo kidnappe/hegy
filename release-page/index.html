@@ -331,7 +331,8 @@ h2{font-size:clamp(36px,3.45vw,55px);line-height:1.16;}
   .navlink-ext span{display:none;}
   .navlink-ext svg{width:16px;height:16px;}
   .scene{padding:0 22px;min-height:118vh;}
-  .copy,.copy.right,.copy.mid,.copy.tight,.copy.narrow,.hero-copy{width:100%;padding-top:11vh;}
+  .copy,.copy.right,.copy.mid,.copy.tight,.copy.narrow,.hero-copy{width:100%;padding-top:9vh;}
+  .hero-copy{padding-top:11vh;}
   .specs,.note{display:none;}
   .lede{font-size:14px;line-height:1.85;}
   h1{font-size:clamp(38px,10.6vw,54px);}
@@ -1193,15 +1194,18 @@ const DESKTOP_KEYS = [
   { w: .46, x: .70, y: .48, r: 3.0, ry: 8 }
 ];
 const MOBILE_KEYS = [
-  { w: 1.52, x: .50, y: .74, r: -2.0, ry: 0 },
-  { w: 1.52, x: .50, y: .74, r: 1.6, ry: 0 },
-  { w: 1.52, x: .50, y: .74, r: -1.2, ry: 0 },
-  { w: 1.52, x: .50, y: .74, r: 1.8, ry: -8 },
-  { w: 1.52, x: .50, y: .74, r: -1.4, ry: 0 },
-  { w: 1.52, x: .50, y: .74, r: 1.2, ry: 0 },
-  { w: 1.52, x: .50, y: .74, r: -1.0, ry: 0 },
-  { w: 1.52, x: .50, y: .74, r: 1.8, ry: 0 },
-  { w: 1.52, x: .50, y: .74, r: -2.2, ry: 6 }
+  /* 移动端不是缩小版桌面：演示图缩小为底部「标本卡」（宽≈全屏、下缘出屏，
+     仅露约 1/5 屏，纯示意不抢内容），文案列独占主屏；滚动间靠状态切换 +
+     轻微角度变化保持「产品在旅行」的感觉。末屏（08 下载）app 整体滑出视口让位。 */
+  { w: .95, x: .50, y: .93, r: -1.5, ry: 3 },
+  { w: .95, x: .50, y: .94, r: 1.2, ry: 0 },
+  { w: .95, x: .50, y: .93, r: -1.0, ry: 0 },
+  { w: .95, x: .50, y: .93, r: 1.4, ry: -6 },
+  { w: .95, x: .50, y: .94, r: -1.2, ry: 0 },
+  { w: .95, x: .50, y: .93, r: .8, ry: 0 },
+  { w: .95, x: .50, y: .94, r: -.8, ry: 0 },
+  { w: .95, x: .50, y: .93, r: 1.0, ry: 0 },
+  { w: .90, x: .50, y: 1.65, r: -2.0, ry: 0 }
 ];
 const STATE_BY_SCENE = ['input', 'input', '2d', '3d', '2d', 'refine', 'chat', '2d', '3d'];
 
@@ -1289,6 +1293,8 @@ function targetFor(y){
 }
 
 function applyTransform(v){
+  /* transform-origin 是 50% 50%（#app 1240×800 的中心），因此 (cx-620, cy-400) 的平移
+     恰好把应用中心精确锚到 (cx,cy)，与缩放无关——桌面/移动端共用，勿改成乘 scale 的写法。 */
   app.style.transform =
     'translate3d(' + (v.cx - 620).toFixed(2) + 'px,' + (v.cy - 400).toFixed(2) + 'px,0) ' +
     'scale(' + v.scale.toFixed(4) + ') rotate(' + v.r.toFixed(2) + 'deg) rotateY(' + v.ry.toFixed(2) + 'deg)';
