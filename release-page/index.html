@@ -180,6 +180,29 @@ h2{font-size:clamp(36px,3.45vw,55px);line-height:1.16;}
   background:rgba(255,255,255,.55);border:1px solid var(--rule-soft);border-radius:2px;padding:9px 11px;
 }
 .dl-hint b{font-weight:600;color:#2a2774;}
+/* 镜像地址 + 提取码：一行摆平（地址占剩余宽度、超长省略），右侧复制按钮一次给「链接 + 密码」 */
+.dl-code{
+  display:flex;align-items:center;flex-wrap:wrap;gap:5px 8px;
+  margin-top:8px;padding:7px 10px;
+  border:1px dashed rgba(23,33,60,.3);border-radius:2px;background:rgba(255,255,255,.6);
+}
+.dl-code .k{flex:none;font-family:var(--mono);font-size:8px;letter-spacing:.14em;color:var(--muted);}
+.dl-code .u{
+  flex:1 1 auto;min-width:0;font-family:var(--mono);font-size:10px;letter-spacing:.01em;
+  color:#2a2774;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.dl-code .u:hover{text-decoration:underline;}
+.dl-code .pw{
+  flex:none;font-family:var(--mono);font-size:11px;font-weight:700;
+  letter-spacing:.18em;color:#2a2774;
+}
+.dl-code .cp{
+  flex:none;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:#2a2774;
+  background:rgba(255,255,255,.7);border:1px solid rgba(23,33,60,.3);border-radius:2px;
+  padding:4px 8px;cursor:pointer;transition:color .2s,border-color .2s,background .2s;
+}
+.dl-code .cp:hover{color:var(--indigo);border-color:var(--indigo);background:#fff;}
+.dl-code .cp.done{color:#2f6b3a;border-color:#2f6b3a;}
 .dl-doc{
   display:inline-flex;align-items:center;gap:7px;margin-top:14px;
   font-family:var(--serif);font-size:14px;font-weight:600;letter-spacing:.04em;color:#2a2774;
@@ -209,6 +232,9 @@ h2{font-size:clamp(36px,3.45vw,55px);line-height:1.16;}
   border-radius:999px;font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;color:var(--ink-2);
   background:var(--paper);
 }
+/* 末屏比别屏多一块下载区（GitHub / 蓝奏云 / 地址行 / 提示 / 说明书），桌面端列顶抬一点，
+   900px 高的窗口里下载区仍收在首屏内。窄屏（≤900px）另有 9vh 的口径，不覆盖 */
+@media (min-width:901px){ #s8 .copy{padding-top:11.5vh;} }
 #s8 .pill{background:var(--paper-4);}
 .pill.accent{border-color:rgba(56,53,140,.38);color:var(--indigo);}
 .hero-copy{padding-top:14vh;width:clamp(300px,34.5vw,540px);}
@@ -888,11 +914,18 @@ h2{font-size:clamp(36px,3.45vw,55px);line-height:1.16;}
           <span class="t"><b>GitHub Releases</b><i>Windows 桌面版 · 需能打开 GitHub</i></span>
           <em>直链 ↗</em>
         </a>
-        <a class="dl-btn" id="dlMirror" href="#" aria-disabled="true">
+        <a class="dl-btn" id="dlMirror" href="https://zhouxuan.lanzoue.com/b0j1u8vej" target="_blank" rel="noopener">
           <svg aria-hidden="true"><use href="#i-download"/></svg>
-          <span class="t"><b>蓝奏云镜像</b><i>国内直连更快 · 同步略有延迟</i></span>
-          <em>待上传</em>
+          <span class="t"><b>蓝奏云镜像</b><i>国内直连更快 · 提取码 4v61</i></span>
+          <em>前往 ↗</em>
         </a>
+        <div class="dl-code">
+          <span class="k">地址</span>
+          <a class="u" id="dlCodeUrl" href="https://zhouxuan.lanzoue.com/b0j1u8vej" target="_blank" rel="noopener">zhouxuan.lanzoue.com/b0j1u8vej</a>
+          <span class="k">提取码</span>
+          <b class="pw" id="dlCodePw">4v61</b>
+          <button type="button" class="cp" id="dlCodeCopy">复制</button>
+        </div>
         <p class="dl-hint">蓝奏云提示「下载需要会员」时不是真要付费——是手机浏览器被导向了会员通道，在菜单里切到<b>电脑模式</b>再打开一次即可。</p>
         <a class="dl-doc" href="manual.html" target="_blank" rel="noopener">使用说明书 · 在线阅读 ↗</a>
       </div>
@@ -1995,9 +2028,9 @@ $$('.a-ref-actions button').forEach(btn => btn.addEventListener('click', () => {
   toast(btn.dataset.refact === 'keep' ? '已保留 · 存为版本 v3' : '已撤销 · 记录仍是 v2');
 }));
 
-/* 蓝奏云镜像：拿到分享链接后填进 MIRROR_URL，第五节的镜像按钮会自动启用（提取码可空） */
-const MIRROR_URL = "";   // 例："https://zhouxuan.lanzoue.com/b0xxxxxxx"
-const MIRROR_CODE = "";  // 例："9c6p"
+/* 蓝奏云镜像：分享链接与提取码（2026-10-25 已上传，链接失效时只改这两行即可） */
+const MIRROR_URL = "https://zhouxuan.lanzoue.com/b0j1u8vej";
+const MIRROR_CODE = "4v61";
 const mirror = $('#dlMirror');
 if (mirror){
   mirror.addEventListener('click', e => {
@@ -2013,6 +2046,39 @@ if (mirror){
     const em = $('em', mirror);
     if (em) em.textContent = '前往 ↗';
   }
+}
+
+/* 镜像地址 / 提取码那一行：文案与常量同源，复制按钮一次给出「链接 + 密码」 */
+const codeUrl = $('#dlCodeUrl'), codePw = $('#dlCodePw'), codeCopy = $('#dlCodeCopy');
+if (codeUrl && MIRROR_URL){
+  codeUrl.textContent = MIRROR_URL.replace(/^https?:\/\//, '');
+  codeUrl.setAttribute('href', MIRROR_URL);
+}
+if (codePw) codePw.textContent = MIRROR_CODE || '—';
+if (codeCopy){
+  codeCopy.addEventListener('click', () => {
+    const text = MIRROR_URL + (MIRROR_CODE ? '  提取码 ' + MIRROR_CODE : '');
+    let ok = false;
+    const done = () => {
+      codeCopy.classList.add('done');
+      codeCopy.textContent = ok ? '已复制' : '手动复制';
+      toast(ok ? '链接与提取码已复制 · 打开后粘贴提取码 ' + MIRROR_CODE : '浏览器不允许自动复制，请手动选中地址');
+      setTimeout(() => { codeCopy.classList.remove('done'); codeCopy.textContent = '复制'; }, 2200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(() => { ok = true; done(); }, () => { fallback(); });
+    } else fallback();
+    function fallback(){
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+      document.body.appendChild(ta);
+      ta.select();
+      try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+      ta.remove();
+      done();
+    }
+  });
 }
 
 app.addEventListener('click', e => {
