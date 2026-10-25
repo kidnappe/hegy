@@ -1417,7 +1417,8 @@
     position: fixed;
     left: 10px; right: 10px;
     bottom: calc(var(--m-sb) + var(--m-peek) + 8px + max(var(--m-kb, 0px), env(keyboard-inset-height, 0px)));
-    z-index: 6;
+    /* 半屏时答案/对象浮层 z-index 会升到 13；对象栏必须压过它。 */
+    z-index: 14;
     height: 46px;
     display: none; align-items: center; gap: 4px;
     padding: 0 6px 0 12px;
@@ -2977,8 +2978,8 @@
 }
 
 @media (max-width:760px) {
-  /* 浮层拉满时画布浮控件整体退场，避免只露一条边 */
-  body.m-sheet-high #stageTop,
+  /* 只有接近全屏时才收起画布工具栏；半屏必须保留（对象页同样） */
+  body.m-sheet-full #stageTop,
   body.m-sheet-high #mMeasureChip{
     opacity: 0;
     pointer-events: none;

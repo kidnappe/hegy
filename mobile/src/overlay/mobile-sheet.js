@@ -214,6 +214,18 @@
       resultShown = true;
       showHome(false); body(true); setDetent(2);
     }, true);
+
+    // 「用这张」只把题图收进首页，接下来由用户决定要不要补答案图。
+    // 这里绝不自动点「解题」：自动开解会让用户错过答案图上传入口。
+    document.addEventListener("hj-question-image-added", function () {
+      if (!MQ.matches) return;
+      resultShown = false;
+      showHome(true);
+      setTimeout(function () {
+        if (!MQ.matches) return;
+        try { if (window.HJ && HJ._ansPreReveal) HJ._ansPreReveal(); } catch (e) {}
+      }, 80);
+    });
   }
 
   function showHome(on) {
@@ -526,7 +538,6 @@
     if (!MQ.matches) return;
     buildObjects();
     buildBar();
-    hideBar();
     if (objPage) {
       objPage.classList.add("show");
       document.body.classList.add("m-objpage-open");
@@ -806,9 +817,12 @@
   function syncFlags() {
     var peek = offset >= maxOffset - 2;
     var high = offset < maxOffset * 0.6;
+    // 只有比半屏更高（接近全屏）才算“满”，半屏不能把画布工具栏一起藏掉
+    var full = offset < DET[1] - 2;
     if (document.body.classList.contains("m-peek") !== peek) document.body.classList.toggle("m-peek", peek);
     // 浮层盖过 40% 就把原题卡/读数条收起来，不然一定压到解析上
     if (document.body.classList.contains("m-sheet-high") !== high) document.body.classList.toggle("m-sheet-high", high);
+    if (document.body.classList.contains("m-sheet-full") !== full) document.body.classList.toggle("m-sheet-full", full);
     syncBar();
   }
 

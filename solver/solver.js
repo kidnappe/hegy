@@ -1440,27 +1440,29 @@
           it.appendChild(mp);
         }
         var tags = document.createElement("div"); tags.className = "hist-tags m-tags";
+        // 固定顺序：时间 → 耗时 → 资费，其余标签随后。
         tags.appendChild(histTag('<use href="#i-history"/>', histTimeShort(rec.ts), "time"));
+        if (rec.elapsedMs != null) tags.appendChild(histTag(HIST_ICON_CLOCK, (rec.elapsedMs / 1000).toFixed(1) + "s"));
+        if (rec.cost) tags.appendChild(histTag(HIST_ICON_COST, rec.cost));
         if (rec.grade) tags.appendChild(histTag(HIST_ICON_GRADE, rec.grade, "grade"));
         if (rec.imgCount) tags.appendChild(histTag('<use href="#i-image"/>', rec.imgCount + " 图"));
         if (rec.chatCount) tags.appendChild(histTag(HIST_ICON_CHAT, "追问 " + rec.chatCount));
-        if (rec.elapsedMs != null) tags.appendChild(histTag(HIST_ICON_CLOCK, (rec.elapsedMs / 1000).toFixed(1) + "s"));
         if (rec.verCount > 1) tags.appendChild(histTag('<use href="#i-layers"/>', rec.verCount + " 版"));
         else if (rec.refined) tags.appendChild(histTag('<use href="#i-wand-2"/>', "已微调"));
-        if (rec.cost) tags.appendChild(histTag(HIST_ICON_COST, rec.cost));
         meta.appendChild(tags);
       } else {
         it.title = subText;
         var tags = document.createElement("div"); tags.className = "hist-tags";
+        // 固定顺序：时间 → 耗时 → 资费，其余标签随后。
         tags.appendChild(histTag('<use href="#i-history"/>', histTimeShort(rec.ts), "time"));
+        if (rec.elapsedMs != null) tags.appendChild(histTag(HIST_ICON_CLOCK, (rec.elapsedMs / 1000).toFixed(1) + "s"));
+        if (rec.cost) tags.appendChild(histTag(HIST_ICON_COST, rec.cost));
         if (rec.model) tags.appendChild(histTag('<use href="#i-sparkles"/>', rec.model, "model"));
         if (rec.grade) tags.appendChild(histTag(HIST_ICON_GRADE, rec.grade, "grade"));
         if (rec.imgCount) tags.appendChild(histTag('<use href="#i-image"/>', rec.imgCount + " 图"));
         if (rec.chatCount) tags.appendChild(histTag(HIST_ICON_CHAT, "追问 " + rec.chatCount));
-        if (rec.elapsedMs != null) tags.appendChild(histTag(HIST_ICON_CLOCK, (rec.elapsedMs / 1000).toFixed(1) + "s"));
         if (rec.verCount > 1) tags.appendChild(histTag('<use href="#i-layers"/>', rec.verCount + " 版"));
         else if (rec.refined) tags.appendChild(histTag('<use href="#i-wand-2"/>', "已微调"));
-        if (rec.cost) tags.appendChild(histTag(HIST_ICON_COST, rec.cost));
         meta.appendChild(tags);
       }
       it.appendChild(meta);
