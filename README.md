@@ -6,7 +6,7 @@
 
 **贴一道几何题，得到一个可以拖动、可以旋转、可以分步看的图形。**
 
-本地运行的 AI 动态几何解题器 · 不注册 · 不上传 · 不需要构建
+本地运行的 AI 动态几何解题器 · 不注册 · 无遥测 · 免构建
 
 <img src="https://img.shields.io/badge/%E7%94%B5%E8%84%91%E7%AB%AF-1.2.1-6e56cf?style=flat-square" alt="电脑端版本" /> <img src="https://img.shields.io/badge/%E6%89%8B%E6%9C%BA%E7%AB%AF-1.2.1-3ddc84?style=flat-square&logo=android&logoColor=white" alt="手机端版本" /> <img src="https://img.shields.io/badge/license-AGPL--3.0-1f6feb?style=flat-square" alt="许可证" /> <img src="https://img.shields.io/badge/node-%E2%89%A5%2018-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js" /> <a href="https://github.com/kidnappe/hegy/actions/workflows/ci.yml"><img src="https://github.com/kidnappe/hegy/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 
