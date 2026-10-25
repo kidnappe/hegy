@@ -9,10 +9,9 @@
      - 手机端：mobile/tools/prepare.js 打包时注入 window.HEGY_MOBILE_VERSION
      - 浏览器直接打开（开发）：显示「开发版」
    缓存：localStorage，30 分钟；离线时回退缓存并标注。
-   应用内更新（仅桌面壳）：
-     - 角标「有新版本」从最新 Release 的资产里挑「安装版」exe（排除 arm64）；
-     - 桌面壳注入 window.HEGY_DESKTOP（desktop/preload.js）→ 点角标在主进程下载、
-       完成后再点拉起安装器覆盖升级；浏览器 / 手机端没有这个接口，点击退回打开 Releases 页。
+   新版本入口：角标「有新版本」→ 点击打开发布页（CFG.site，GitHub Pages），
+     在发布页选包下载。不再走应用内下载——安装包托管在 github.com，国内经常连不通，
+     桌面壳的 downloadUpdate / installUpdate 接口保留（desktop/main.js），但当前未接。
    ========================================================= */
 (function () {
   /* ==================== ★ 需要你填的配置 ★ ==================== */
@@ -20,6 +19,8 @@
     // GitHub 仓库（owner/repo）。发布 Release 时按上面的 tag 约定打 tag，
     // Release 正文用 Markdown 列表（- 开头），「关于页」会原样渲染成条目。
     repo: "kidnappe/hegy",           // 例："your-name/hegy"
+    // 发布页（「有新版本」点下去就开这里）。留空则退回 Releases 页。
+    site: "https://kidnappe.github.io/hegy/",
     // 爱发电主页链接。没有就留空字符串，版本行右侧的入口会自动隐藏。
     afdian: "https://afdian.com/a/zhouxuano6",
     // 版权署名与起始年份
@@ -40,9 +41,9 @@
   var CACHE_KEY = "hegy_about_releases_v1";
   var TTL = 30 * 60 * 1000;
   var state = { wired: false, end: null, list: null, listErr: null };
-  /* 应用内更新状态机：idle →（点角标）downloading →（下完再点）done → installUpdate；
-     error 状态点击重试。available/url 在每次 renderVer 时按最新 Release 重新计算。 */
-  var upd = { phase: "idle", pct: 0, received: 0, total: 0, latest: "", available: false, url: "", name: "" };
+  /* upd.latest：当前端有比本地版本更新的 Release 时填 tag（不含 mobile- 前缀），
+     由 renderVer 计算；角标文案 / 启动红点都读它。 */
+  var upd = { latest: "" };
 
   function $(id) { return document.getElementById(id); }
   function esc(t) {
@@ -168,76 +169,26 @@
       renderBody(r.body) + "</div>";
   }
 
-  /* ---------- 应用内更新：从 Release 资产里挑安装包 ---------- */
-  /* 只认「安装版」exe（NSIS 覆盖安装）；arm64 产物（名字带 -arm64）优先跳过，x64 没有再兜底 */
-  function pickInstallerAsset(rel) {
-    var assets = (rel && rel.assets && rel.assets.length) ? rel.assets : [];
-    var cands = [];
-    for (var i = 0; i < assets.length; i++) {
-      var a = assets[i] || {};
-      if (a.state && a.state !== "uploaded") continue;
-      if (/-安装版\.exe$/i.test(String(a.name || ""))) cands.push(a);
-    }
-    var x64 = [];
-    for (var j = 0; j < cands.length; j++) {
-      if (String(cands[j].name).toLowerCase().indexOf("arm64") < 0) x64.push(cands[j]);
-    }
-    var pick = (x64.length ? x64 : cands)[0];
-    return pick && pick.browser_download_url
-      ? { url: pick.browser_download_url, name: pick.name, size: pick.size || 0 }
-      : null;
+  /* ---------- 新版本角标：点击去发布页 ---------- */
+  /* 桌面端 / 手机端行为一致。安装包挂在 github.com，国内常连不通，所以入口统一指向
+     发布页（github.io），下载与镜像都在那边；发布页没配才退回 Releases 页。 */
+  function downloadUrl() {
+    if (CFG.site) return CFG.site;
+    return CFG.repo ? repoUrl() + "/releases" : "";
   }
-
   function renderNewBadge() {
     var nw = $("aboutNew");
     if (!nw) return;
-    var text = upd.latest ? "有新版本 " + upd.latest : "";
-    var interactive = false, tip = "";
-    if (upd.phase === "downloading") {
-      interactive = true;
-      text = "正在下载更新… " + (upd.total ? Math.floor(upd.pct) + "%" : Math.round(upd.received / 1048576) + "MB");
-    } else if (upd.phase === "done") {
-      interactive = true; text = "更新包已下载 · 点击安装";
-    } else if (upd.phase === "error") {
-      interactive = true; text = "更新下载失败 · 点击重试";
-    } else if (upd.available) {
-      interactive = true; text += " · 点击更新";
-    } else if (upd.latest) {
-      tip = "请在 GitHub Releases 页手动下载";
-    }
-    nw.textContent = text;
-    nw.title = tip;
-    nw.classList.toggle("update", interactive);
-    if (interactive) { nw.setAttribute("role", "button"); nw.setAttribute("tabindex", "0"); }
+    var go = !!downloadUrl();
+    nw.textContent = upd.latest ? "有新版本 " + upd.latest + (go ? " · 去下载" : "") : "";
+    nw.title = go ? "打开发布页下载新版" : "";
+    nw.classList.toggle("update", go);
+    if (go) { nw.setAttribute("role", "button"); nw.setAttribute("tabindex", "0"); }
     else { nw.removeAttribute("role"); nw.removeAttribute("tabindex"); }
   }
-  function startDownload() {
-    var d = desk();
-    if (!d || !upd.url || upd.phase === "downloading") return;
-    upd.phase = "downloading"; upd.pct = 0; upd.received = 0; upd.total = 0;
-    renderNewBadge();
-    d.downloadUpdate(upd.url).then(function (res) {
-      if (res && res.ok) {
-        upd.phase = "done";
-        upd.received = res.size || upd.received;
-        upd.total = res.size || upd.total;
-        upd.pct = 100;
-      } else {
-        upd.phase = "error";
-      }
-      renderNewBadge();
-    }, function () { upd.phase = "error"; renderNewBadge(); });
-  }
   function onNewBadgeClick() {
-    if (upd.phase === "downloading") return;
-    if (upd.phase === "done") {
-      var d = desk();
-      if (d) d.installUpdate(); // 主进程拉起安装器后自动退出本应用
-      return;
-    }
-    if (upd.phase === "error" || upd.available) { startDownload(); return; }
-    /* 走不了应用内更新（浏览器 / 手机 / Release 未传安装包）：退回 Releases 页手动下载 */
-    if (CFG.repo) openExternal(repoUrl() + "/releases");
+    var url = downloadUrl();
+    if (url) openExternal(url);
   }
 
   /* ---------- 各状态渲染 ---------- */
@@ -306,11 +257,6 @@
       var has = isNewer(latest, cur.v);
       nw.hidden = !has;
       upd.latest = has ? latest : "";
-      upd.available = false; upd.url = ""; upd.name = "";
-      if (has && cur.end === "desktop" && rel) {
-        var asset = pickInstallerAsset(rel);
-        if (asset && desk()) { upd.available = true; upd.url = asset.url; upd.name = asset.name; }
-      }
       renderNewBadge();
     }
   }
@@ -380,7 +326,7 @@
         open();
       });
     }
-    dot.title = "有新版本 " + ver + "，点击查看";
+    dot.title = "有新版本 " + ver + "，点击查看并下载";
     dot.classList.add("show");
   }
   function clearNewDot() {
@@ -413,7 +359,7 @@
     loadLog(false, function () {
       if (!upd.latest) return;   /* renderVer 里已算好：有比当前更新的 Release 才非空 */
       showNewDot(upd.latest);
-      bootToast("有新版本 " + upd.latest + "，点设置按钮上的红点查看");
+      bootToast("有新版本 " + upd.latest + "，点设置按钮上的红点去下载");
     });
   }
 
@@ -458,17 +404,6 @@
       nw.addEventListener("click", onNewBadgeClick);
       nw.addEventListener("keydown", function (e) {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNewBadgeClick(); }
-      });
-    }
-    var d = desk();
-    if (d && d.onUpdateEvent) {
-      d.onUpdateEvent(function (ev) {
-        if (!ev || ev.type !== "progress") return;
-        upd.phase = "downloading";
-        upd.pct = ev.pct || 0;
-        upd.received = ev.received || 0;
-        upd.total = ev.total || 0;
-        renderNewBadge();
       });
     }
 

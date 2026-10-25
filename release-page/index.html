@@ -722,7 +722,7 @@ h2{font-size:clamp(36px,3.45vw,55px);line-height:1.16;}
     <div class="hero-bottom">
       <div class="hero-line">
         <span>何解 · DYNAMIC GEOMETRY</span>
-        <span>首发 v1.2.0 / 2026</span>
+        <span>v1.2.1 / 2026</span>
         <span>一个界面，走完整页</span>
       </div>
       <div class="giant">HEGY</div>
@@ -882,10 +882,10 @@ h2{font-size:clamp(36px,3.45vw,55px);line-height:1.16;}
         <div class="spec"><span>平台</span><b>Windows / Android</b></div>
       </div>
       <div class="dl reveal d4">
-        <div class="cap"><span>DOWNLOAD / 获取何解</span><span>v1.2.0</span></div>
+        <div class="cap"><span>DOWNLOAD / 获取何解</span><span>v1.2.1</span></div>
         <a class="dl-btn primary" href="https://github.com/kidnappe/hegy/releases/latest" target="_blank" rel="noopener">
           <svg aria-hidden="true"><use href="#i-github"/></svg>
-          <span class="t"><b>GitHub Releases</b><i>Windows 桌面版 · 版本永远最新</i></span>
+          <span class="t"><b>GitHub Releases</b><i>Windows 桌面版 · 需能打开 GitHub</i></span>
           <em>直链 ↗</em>
         </a>
         <a class="dl-btn" id="dlMirror" href="#" aria-disabled="true">
@@ -898,7 +898,7 @@ h2{font-size:clamp(36px,3.45vw,55px);line-height:1.16;}
       </div>
       <div class="pills reveal d4">
         <a class="pill" href="#s0" style="text-decoration:none">回到开头 ↑</a>
-        <span class="pill accent">首发 v1.2.0</span>
+        <span class="pill accent">v1.2.1</span>
       </div>
     </div>
     <div class="hero-bottom">
@@ -1792,9 +1792,21 @@ function frame(now){
 /* ---------- 移动端：演示图「钉进页面」 ----------
    每屏文案下方放一个 .appDock 槽位，#app 嵌在当前屏的槽里随页面滚动（不再是视口固定层）；
    槽位滚出视野后把 #app 搬到相邻屏的槽位——用户看到的永远是「内容里的演示卡」。
+   dock 按 DOCK_VIEWS 裁切聚焦：不旋转（摆正），只放大该屏相关区域保证信息可读。
    末屏（下载/COLOPHON）不放槽位，屏幕让给下载区与巨字。桌面端保持视口旅行系统不变。 */
 const stage = $('#stage');
-const dockRot = MOBILE_KEYS.map(k => k.r || 0);
+/* 聚焦区域（应用坐标 1240×800；三栏：左栏 0–224 / 画布 229–860 / 右栏 860–1240）：
+   输入屏看欢迎卡、图形屏看画布、解答/微调/追问屏看右栏面板（380px 面板≈0.95 倍，文字可读） */
+const DOCK_VIEWS = [
+  { x: 300, y: 240, w: 620, h: 460 },
+  { x: 300, y: 240, w: 620, h: 460 },
+  { x: 229, y: 52, w: 631, h: 720 },
+  { x: 229, y: 52, w: 631, h: 720 },
+  { x: 860, y: 52, w: 380, h: 720 },
+  { x: 860, y: 52, w: 380, h: 720 },
+  { x: 860, y: 52, w: 380, h: 720 },
+  { x: 229, y: 52, w: 631, h: 720 }
+];
 let dockIdx = -1;
 function ensureDocks(){
   scenes.forEach((sc, i) => {
@@ -1809,10 +1821,12 @@ function ensureDocks(){
 function applyDockTransform(i){
   const dock = scenes[i] && scenes[i].querySelector('.appDock');
   if (!dock) return;
-  const s = dock.clientWidth / 1240;
+  const v = DOCK_VIEWS[i] || { x: 0, y: 0, w: 1240, h: 800 };
+  const k = dock.clientWidth / v.w;
+  dock.style.aspectRatio = v.w + ' / ' + v.h;
   app.style.transformOrigin = '0 0';
   app.style.transition = 'none';
-  app.style.transform = 'scale(' + s.toFixed(4) + ') rotate(' + (dockRot[i] || 0) + 'deg)';
+  app.style.transform = 'translate(' + (-v.x * k).toFixed(2) + 'px,' + (-v.y * k).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
 }
 function dockTo(i){
   if (i === dockIdx || i < 0) return;
