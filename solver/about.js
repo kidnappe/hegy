@@ -338,6 +338,7 @@
   function open() {
     var m = $("aboutModal");
     if (!m) return;
+    clearNewDot();
     var cur = currentVersion();
     setEnd(cur.end === "mobile" ? "mobile" : "desktop");
     renderVer();
@@ -349,6 +350,73 @@
     var m = $("aboutModal");
     if (m) m.classList.remove("show");
   }
+
+  /* ---------- 启动静默检查：有新版本 → 设置按钮红点 + 轻提示（不弹窗，不打扰） ----------
+     延迟 8s 等界面/网络稳定；复用 loadLog 的 30 分钟缓存 + ETag（304 不耗额度，桌面走主进程直连）。
+     点红点直达关于页；打开过关于页红点即消。提示条复用 ui.css 的 .toast 样式（#toastHost）。 */
+  var bootChecked = false;
+  function ensureDotStyle() {
+    if (document.getElementById("btnCfgDotStyle")) return;
+    var st = document.createElement("style");
+    st.id = "btnCfgDotStyle";
+    st.textContent = "#btnCfg{position:relative}" +
+      "#btnCfgDot{position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;" +
+      "background:var(--warn,#e8590c);border:2px solid var(--panel,#fff);cursor:pointer;display:none}" +
+      "#btnCfgDot.show{display:block;animation:abNewDot 2.4s ease-in-out infinite}" +
+      "@keyframes abNewDot{0%,100%{transform:scale(1);opacity:.95}50%{transform:scale(1.3);opacity:.5}}";
+    document.head.appendChild(st);
+  }
+  function showNewDot(ver) {
+    var btn = $("btnCfg");
+    if (!btn) return;
+    ensureDotStyle();
+    var dot = document.getElementById("btnCfgDot");
+    if (!dot) {
+      dot = document.createElement("span");
+      dot.id = "btnCfgDot";
+      btn.appendChild(dot);
+      dot.addEventListener("click", function (e) {
+        e.stopPropagation(); e.preventDefault();
+        open();
+      });
+    }
+    dot.title = "有新版本 " + ver + "，点击查看";
+    dot.classList.add("show");
+  }
+  function clearNewDot() {
+    var dot = document.getElementById("btnCfgDot");
+    if (dot) dot.classList.remove("show");
+  }
+  function bootToast(text) {
+    var host = $("toastHost");
+    if (!host) {   /* ui.js 的 toast() 是用到才建宿主，这里同样兜底创建 */
+      host = document.createElement("div");
+      host.id = "toastHost";
+      document.body.appendChild(host);
+    }
+    var t = document.createElement("div");
+    t.className = "toast";
+    t.innerHTML = "<span>" + esc(text) + "</span>";
+    host.appendChild(t);
+    requestAnimationFrame(function () { requestAnimationFrame(function () { t.classList.add("in"); }); });
+    setTimeout(function () {
+      t.style.maxHeight = t.offsetHeight + "px";
+      void t.offsetWidth;
+      t.classList.add("out");
+      t.style.maxHeight = "0px";
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 340);
+    }, 5200);
+  }
+  function checkOnBoot() {
+    if (bootChecked || !CFG.repo) return;
+    bootChecked = true;
+    loadLog(false, function () {
+      if (!upd.latest) return;   /* renderVer 里已算好：有比当前更新的 Release 才非空 */
+      showNewDot(upd.latest);
+      bootToast("有新版本 " + upd.latest + "，点设置按钮上的红点查看");
+    });
+  }
+
   function setEnd(end) {
     state.end = end;
     var seg = document.querySelectorAll("#aboutModal .ab-seg button");
@@ -443,6 +511,7 @@
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
+  setTimeout(checkOnBoot, 8000);   /* 启动静默检查（见上）：有新版本挂红点 + 轻提示 */
 
   window.HJAbout = { open: open, close: close, reload: function () { loadLog(true); } };
 })();
