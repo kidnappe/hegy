@@ -2048,7 +2048,7 @@ if (mirror){
   }
 }
 
-/* 镜像地址 / 提取码那一行：文案与常量同源，复制按钮一次给出「链接 + 密码」 */
+/* 镜像地址 / 提取码那一行：文案与常量同源，复制按钮只复制提取码（地址本身点一下就能打开） */
 const codeUrl = $('#dlCodeUrl'), codePw = $('#dlCodePw'), codeCopy = $('#dlCodeCopy');
 if (codeUrl && MIRROR_URL){
   codeUrl.textContent = MIRROR_URL.replace(/^https?:\/\//, '');
@@ -2057,12 +2057,12 @@ if (codeUrl && MIRROR_URL){
 if (codePw) codePw.textContent = MIRROR_CODE || '—';
 if (codeCopy){
   codeCopy.addEventListener('click', () => {
-    const text = MIRROR_URL + (MIRROR_CODE ? '  提取码 ' + MIRROR_CODE : '');
+    const text = MIRROR_CODE;
     let ok = false;
     const done = () => {
       codeCopy.classList.add('done');
       codeCopy.textContent = ok ? '已复制' : '手动复制';
-      toast(ok ? '链接与提取码已复制 · 打开后粘贴提取码 ' + MIRROR_CODE : '浏览器不允许自动复制，请手动选中地址');
+      toast(ok ? '提取码 ' + MIRROR_CODE + ' 已复制 · 打开链接后粘贴' : '浏览器不允许自动复制，请手动输入提取码 ' + MIRROR_CODE);
       setTimeout(() => { codeCopy.classList.remove('done'); codeCopy.textContent = '复制'; }, 2200);
     };
     if (navigator.clipboard && navigator.clipboard.writeText){

@@ -22,8 +22,8 @@
 - **蓝奏云已上线**（2026-10-25 晚）：地址 `https://zhouxuan.lanzoue.com/b0j1u8vej`、提取码 `4v61`。
   镜像按钮 href 直接写死在 HTML 里（不依赖 JS 才有链接），副文案带提取码、右侧 `前往 ↗`；
   按钮下方新增一行 `.dl-code`：`地址 zhouxuan.lanzoue.com/b0j1u8vej · 提取码 4v61 · [复制]`，
-  复制按钮一次把「链接 + 提取码」放进剪贴板（`navigator.clipboard`，file:// 下退到
-  `execCommand`，两者都不行就提示手动选）。地址/提取码的唯一来源仍是 JS 尾部的
+  复制按钮**只复制提取码**（`4v61`，地址本身点一下就开了，不用复制；`navigator.clipboard`，file:// 下退到
+  `execCommand`，两者都不行就提示手动输入）。地址/提取码的唯一来源仍是 JS 尾部的
   `MIRROR_URL` / `MIRROR_CODE`，换链接只改这两行。
 - **末屏列顶**：`@media (min-width:901px){#s8 .copy{padding-top:11.5vh}}`——末屏比别屏多一块下载区，
   列顶抬 3.5vh，让 1440×900 下两个下载按钮 + 地址行都收在首屏内（说明书链接与页脚 pills
