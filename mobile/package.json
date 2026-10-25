@@ -1,13 +1,16 @@
 {
   "name": "hejie-mobile",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "description": "何解 Android MVP (Capacitor)",
   "scripts": {
     "prepare": "node tools/prepare.js",
     "sync": "node tools/prepare.js && cap sync android",
     "build": "node tools/prepare.js && cap sync android && cd android && gradlew.bat assembleDebug",
-    "install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk"
+    "install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "build:release": "node tools/prepare.js && cap copy android && node tools/release-flag.js && node tools/build-release.js",
+    "build:release:debuggable": "node tools/prepare.js && cap copy android && node tools/release-flag.js --on && node tools/build-release.js --debuggable",
+    "install:release": "node tools/install-release.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

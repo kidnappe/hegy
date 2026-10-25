@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+// 版本号单源：versionName 取 mobile/package.json（prepare.js 注入 web 层的也是它），
+// versionCode 手动递增 —— Android 只认它，每次发版必须 +1。
+def pkg = new groovy.json.JsonSlurper().parseText(file('../../package.json').getText('UTF-8'))
+
+// 签名材料只在本地：mobile/android/keystore.properties + app-release.keystore
+// （两者都在 .gitignore 里；母本在 Documents\何解-App签名密钥备份-2026-10-24）
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 android {
     namespace = "com.hejie.solver"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +19,8 @@ android {
         applicationId "com.hejie.solver"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.2.1"
+        versionCode 4
+        versionName pkg.version
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +28,35 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (keystorePropsFile.exists()) signingConfig signingConfigs.release
+            // 仅供「换签名后把旧数据塞回去」用：-PhejieDebuggable 出一个可 run-as 的正式签名包。
+            // 平时不要带这个参数，正式包必须是不可调试的。
+            if (project.hasProperty('hejieDebuggable')) debuggable true
+        }
+    }
+}
+
+// 没有签名材料就别悄悄产出未签名包：直接失败，省得又发一个装不上的 apk
+tasks.whenTaskAdded { t ->
+    if (t.name == 'assembleRelease' || t.name == 'bundleRelease') {
+        t.doFirst {
+            if (!keystorePropsFile.exists()) {
+                throw new GradleException('缺少 mobile/android/keystore.properties，无法签名 release 包（母本见 Documents\\何解-App签名密钥备份-2026-10-24）')
+            }
         }
     }
 }

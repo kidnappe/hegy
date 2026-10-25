@@ -156,7 +156,6 @@
     wizRow.querySelector(".v").textContent = "3 步";
     root.appendChild(group("解题", [
       row("model", "模型配置", "服务商、Key、模型", "i-sparkles"),
-      wizRow,
       row("view", "画法", "真实尺寸 / 像题图", "i-ruler")
     ]));
     root.appendChild(group("界面", [
@@ -165,6 +164,7 @@
     root.appendChild(group("数据与支持", [
       row("records", "解题记录", "查看与删除", "i-history"),
       row("diag", "诊断", "错误日志", "i-file-json"),
+      wizRow,
       row("about", "关于何解", "版本 · 更新记录 · 版权", "i-info")
     ]));
     modal.insertBefore(root, hd.nextSibling);
@@ -215,7 +215,7 @@
     appearPage.appendChild(el("div", "m-set-note", "皮肤：整个界面的配色与质感。公式、画布图形和导出页不随皮肤变化。"));
     var skinHost = el("div", "m-set-pick");
     appearPage.appendChild(skinHost);
-    appearPage.appendChild(el("div", "m-set-note", "主题：日间 / 夜间。画布始终保持白纸，图形颜色不受影响。"));
+    appearPage.appendChild(el("div", "m-set-note", "主题：日间 / 夜间 / 跟随系统。画布始终保持白纸，图形颜色不受影响。"));
     var themeHost = el("div", "m-set-pick");
     appearPage.appendChild(themeHost);
 
@@ -250,18 +250,22 @@
         skinHost.appendChild(b);
       });
     }
+    function themeModeNow() {
+      if (window.HJ && HJ._themeMode) return HJ._themeMode();
+      return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    }
     function renderThemePick() {
-      var dark = document.documentElement.getAttribute("data-theme") === "dark";
-      var cur = dark ? "dark" : "light";
+      var cur = themeModeNow();
       themeHost.innerHTML = "";
-      [["light", "日间"], ["dark", "夜间"]].forEach(function (p) {
+      [["light", "日间"], ["dark", "夜间"], ["auto", "跟随系统"]].forEach(function (p) {
         var b = el("button", "m-set-pick-row");
         b.type = "button";
         markPick(b, p[0] === cur);
         b.appendChild(el("span", "t", p[1]));
         b.appendChild(checkNode());
         b.addEventListener("click", function () {
-          if (p[0] !== cur) { var t = $("btnTheme"); if (t) t.click(); }
+          if (window.HJ && HJ._themeSetMode) HJ._themeSetMode(p[0]);
+          else if (p[0] !== cur) { var t = $("btnTheme"); if (t) t.click(); }
           renderThemePick();
           refresh();
         });
@@ -331,14 +335,15 @@
       if (rrow) rrow.textContent = cnt + " 条";
       var rsub = recPage.querySelector('[data-go="hist"] .v');
       if (rsub) rsub.textContent = cnt + " 条";
-      var dark = document.documentElement.getAttribute("data-theme") === "dark";
+      var mode = themeModeNow();
+      var modeText = mode === "auto" ? "跟随系统" : (mode === "dark" ? "夜间" : "日间");
       var skinName = "";
       if (window.HJSkin && HJSkin.current) {
         var cur = HJSkin.current();
         HJSkin.SKINS.forEach(function (s2) { if (s2.key === cur) skinName = s2.name; });
       }
       var arow = root.querySelector('[data-go="appearance"] .v');
-      if (arow) arow.textContent = (skinName || "原色") + " · " + (dark ? "夜间" : "日间");
+      if (arow) arow.textContent = (skinName || "原色") + " · " + modeText;
       if (typeof renderSkinPick === "function") { renderSkinPick(); renderThemePick(); }
       var vs = $("view");
       var vrow = root.querySelector('[data-go="view"] .v');
@@ -473,8 +478,8 @@
       body.insertBefore(el("h1", "m-hist-h1", "解题记录"), subEl);
     }
 
-    // 每次重渲染后补三件事：分组条数、纯文字题的占位砖、把「2026/10/25 10:30:02」
-    // 收成「10:30」（日期已经由分组条表达了，整串日期把摘要挤成两行）。
+    // 每次重渲染后补三件事：分组条数、纯文字题的占位砖、短标题行的缩略图下移
+    // （模型 chip 在缩略图左上角，需要让位；时间已由 solver.js 的 histTimeShort 收短）。
     function decorateHistory() {
       var list0 = $("histList");
       if (!list0) return;
@@ -497,19 +502,12 @@
           ph.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-list"/></svg>';
           it.insertBefore(ph, it.firstChild);
         }
-        var s = it.querySelector(".meta .sub");
-        if (!s) return;
-        var parts = String(s.textContent || "").split(" · ");
-        var head = parts.shift() || "";
-        var hm = head.match(/(\d{1,2}):(\d{2})/);
-        s.innerHTML = "";
-        if (hm) {
-          // 补零：卡片里时间是等宽数字，「5:18 / 05:18」混排会左右跳
-          var hh = hm[1].length === 1 ? "0" + hm[1] : hm[1];
-          s.appendChild(el("b", null, hh + ":" + hm[2]));
-          if (parts.length) s.appendChild(document.createTextNode(" · " + parts.join(" · ")));
-        } else {
-          s.textContent = parts.join(" · ");
+        // 短标题行的 meta 比缩略图矮，缩略图会贴到卡片顶部、压住模型 chip；
+        // 只在这种行把缩略图下移让位（transform 不参与布局，行高不变）。
+        var th = it.querySelector(".thumb-sm");
+        var me = it.querySelector(".meta");
+        if (th && me) {
+          th.classList.toggle("m-thumb-shift", !!it.querySelector(".hist-model") && me.offsetHeight < 64);
         }
       });
     }
@@ -726,11 +724,13 @@
           '<p>国内模型直连；换服务商只改这一处。</p>' +
           '<label class="m-wiz-f">服务商<select class="w-preset"></select></label>' +
           '<label class="m-wiz-f">接口地址<input class="w-base" spellcheck="false" placeholder="https://api.deepseek.com/v1" /></label>' +
+          '<div class="m-wiz-site" data-site="1"></div>' +
         '</div>' +
         '<div class="m-wiz-step" data-step="2">' +
           '<h3>填入 API Key</h3>' +
           '<p>只保存在本机，用于直接调用模型。</p>' +
           '<label class="m-wiz-f">API Key<input class="w-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-..." /></label>' +
+          '<div class="m-wiz-site" data-site="2"></div>' +
         '</div>' +
         '<div class="m-wiz-step" data-step="3">' +
           '<h3>选模型</h3>' +
@@ -761,10 +761,31 @@
       Array.prototype.forEach.call(src.options, function (o) {
         var op = document.createElement("option");
         op.value = o.value; op.textContent = o.textContent;
+        // 服务商的「API 开放平台」地址跟着预设走（solver.js 的 PRESETS.site）
+        if (o.dataset && o.dataset.site) op.dataset.site = o.dataset.site;
         preset.appendChild(op);
       });
     }
+    // 用户在「服务商」里主动选过之后，才在下方空白处给出该厂商的 API 开放平台地址。
+    // 首次进入的自动预选（见下面的初始化）不走这里，所以不会一进来就亮出来。
+    function renderSite() {
+      var o = preset.options[preset.selectedIndex];
+      var site = (o && o.dataset && o.dataset.site) || "";
+      Array.prototype.forEach.call(page.querySelectorAll(".m-wiz-site"), function (h) {
+        h.innerHTML = "";
+        h.classList.toggle("on", !!site);
+        if (!site) return;
+        h.appendChild(el("span", "lab", "API 开放平台"));
+        var a = document.createElement("a");
+        a.href = site;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = site.replace(/^https?:\/\//, "");
+        h.appendChild(a);
+      });
+    }
     preset.onchange = function () {
+      renderSite();
       if (!src) return;
       src.value = preset.value;
       src.dispatchEvent(new Event("change"));
@@ -788,6 +809,7 @@
         if (fb0) base.value = fb0.value || "";
       }
     }
+    // 注意：这里**不调** renderSite()。自动预选不算「用户选择」，地址块保持隐藏。
 
     function renderStep() {
       Array.prototype.forEach.call(page.querySelectorAll(".m-wiz-step"), function (s) {
