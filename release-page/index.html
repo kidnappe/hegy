@@ -1,0 +1,1998 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>何解 Hegy — 本地运行的 AI 动态几何解题器</title>
+<meta name="description" content="何解（Hegy）：贴一道题，得到可以拖动、旋转、分步讲的图形。本地运行、按 AGPL-3.0 开源、支持离线单文件导出。Windows / Android 下载。">
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVnSURBVFhH7VbbbxRVHMYHo9FnH3zAxMT4TyhUkEKv9M7uXHd71RbaNOHFYGkVShNoC0WguAXv+CKIUSGgUZBiFJTubndmd/YO3e6WblvbUihtAfOZc3ZmOjtb6T7ywC/5smfO5fu+8zu/ObNr1jyNJzlaW30v19ZGLXZ7uE3g/F0M4+3iCDili+PUtgFknLGkxm22YHttdYRvbAytNfNmFTYhuJdnQzM2IQ67OAa7MEZ/baSt/tqEBAUd1/oFrZ88JyBw4bsiH+xxOG48a9ZYMQA8w7PK2Rr7JDgmCMYip8FKsE2DBEuVRNvGceN8wlFjn4LAKj87HFjdhMDJ7WQBJVNFNFIqrotIKCsZpqBzVBN0jckEAeEUeanXrJcWzc3Blxird17buXG3ac8WGUUFbvR238Kh3hEU5rvTDJrFSR9rDYBjlIctLZFXzLp6iKLMkPNbicAoXlHmoRm4P/8ICwuPwFq1PrO4N7Ve3USqRnz1Zl09RF7uIMWjLTLvSuvLy3Xhh+8nkEwuYnb2Ic79OIm8zSQLXnVuSlhfrxog3KLg22/W1UPg5P1aBnTRNBIJxYXDaNsVgd9/D8f7RzHgSEBR7qG9LULHtCwZhZcNkLdCPmzW1cNu8x4kkzQSY/oItlVKKCkeRjg8jw87oujtGcHhvhjad0cRidynY2SOvsaUDcLNW+U+s64emgEtlUZxQpC/xY3PPxuDyzWH9W8MYcARxycnE7TtHJrDl1+MqUexnIEMA2xWBjJTSIqsxu5DMrmEHdsD2LTRpRvI3ehEU2MA4+NLdE55qSfDPDGStQHj4hQkWniDgzP47uwEtuS6UJTvxrGjMTiOx+lrSHZ+5vQEfr86g7zNLv1uWDaQZQZEPp6xuLjQjbb3w4jHF+kZV1VI1MDpb8Zx9tskNbCtQqb9o7EFdOw2FKQBKQO+xxuw8ekZIFft1iI3QqF59B2MoTB/mIrX1/qgRUO9gqKCYYqe7hGEQ/PYWjQMS5UMRq2DZQOrZMB4BKnCc2Hg4zi88j0U5LlpITbUKbjy2zSmph5QDF6Zxjv1CvI3u1CwxQ3JcxcnTyRom6Y/LQOrGTBkoLLcA46RaeG1NAewacMQNSNJd+ldcOSjGPqPjWLXe+GU6EAcuW87saMpgOT4EgTWi8ry5ePM4giUtAyQwjt/bpIWHjFy7c9ZXLz4D3jWi7fWO/W3IGedExzrxYULU7h+bRY8I+HM6SR+ujBFi5PyWchVvIqBGvuygdKtHrTs8GN0dAFfn7oNp3MO+zpv0iOorEjdiCcGEtQAaZMCJGOde27C5ZzDqa9u04JsbQlSrqwyUC0qvdoRkMr+6/odTEwsURFSVGTXRIwgZ90Qjh6J4Xh/HDlvDun9G3KcdO6nJxOYSC7hxt93KJdm4LFXMc/6OokBQtC5J0orPJFYpMdw+dI0rg7O0LuA4NKv04iE5xGN3MelX6ZT/Vdm6Bwy9/y5KSTii5SDZI5wkn9VIu87YNbVQ+C8NeSLVVUu0dR1tEexd89N9HTHKLoPjFCQdm9PDF37blFybSx9zgg9jg/ao2htCaCyzEMN2ATPu2ZdPRobpbWsxfeQswZo9ZYUe1RIKNXbWaBIhfpcUSaBtfrBWHz/1tX5XzXrpgXPeA5V2ybVCyTzi2iEdsH8H7RvALlZCafAyv1mvYxobg4+x1u9l8kC1uLPIKWoWqFPEzU9k50TLp5V/mhouPGCWW/F6LBdfl7klWMcE1yy8WMghUkqmEAkbRWkrUHr06D9jeeY0AORDw7s3Ol+0ayzajQ1hV6zi6E6gffvs4veQ9WCr88m+Pq038eCU7rqqqMN2+sir5t5n8YTFf8BtgeOJsmQIo0AAAAASUVORK5CYII=">
+<style>
+:root{
+  --paper:#e9e2d3;
+  --paper-2:#e3dccb;
+  --paper-3:#e6dfcf;
+  --paper-4:#e0d8c7;
+  --ink:#17213c;
+  --ink-2:#3c455b;
+  --muted:#73766f;
+  --indigo:#38358c;
+  --indigo-2:#5b5bd6;
+  --rule:rgba(23,33,60,.19);
+  --rule-soft:rgba(23,33,60,.10);
+  --black:#14161c;
+  --serif:"Noto Serif SC","Source Han Serif SC","STZhongsong","Songti SC","STSong","SimSun",serif;
+  --sans:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  --mono:"Consolas","Cascadia Mono","SFMono-Regular",monospace;
+  --ease:cubic-bezier(.2,.7,.18,1);
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--sans);overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+::selection{background:rgba(56,53,140,.18);}
+button{font-family:inherit;}
+a{color:inherit;}
+
+#grain{
+  position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.55;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.28'/%3E%3C/svg%3E");
+  background-size:180px 180px;mix-blend-mode:multiply;
+}
+#progress{
+  position:fixed;left:0;top:0;height:2px;width:100%;z-index:90;background:var(--indigo);
+  transform:scaleX(0);transform-origin:0 50%;pointer-events:none;
+}
+
+/* ---------- nav ---------- */
+#nav{
+  position:fixed;left:0;right:0;top:0;z-index:60;height:58px;
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  padding:0 3vw;border-bottom:1px solid var(--rule-soft);
+  background:rgba(233,226,211,.84);backdrop-filter:blur(12px) saturate(1.05);
+}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;width:max-content;}
+.brand img{width:26px;height:26px;border-radius:7px;display:block;}
+.brand .zh{font-family:var(--serif);font-size:19px;font-weight:600;letter-spacing:.02em;line-height:1;}
+.brand .en{font-family:var(--mono);font-size:8px;letter-spacing:.22em;color:var(--muted);margin-left:2px;line-height:1.3;}
+.navlinks{display:flex;align-items:center;gap:clamp(12px,1.7vw,26px);}
+.navlinks a{
+  position:relative;text-decoration:none;font-family:var(--mono);font-size:9px;
+  letter-spacing:.12em;color:var(--muted);padding:4px 0;white-space:nowrap;
+  transition:color .2s;
+}
+.navlinks a span{opacity:.55;margin-right:5px;}
+.navlinks a:hover,.navlinks a.on{color:var(--ink);}
+.navlinks a.on::after{
+  content:"";position:absolute;left:0;right:0;bottom:-2px;height:1px;background:var(--ink);
+}
+.navright{display:flex;align-items:center;justify-content:flex-end;gap:16px;}
+.navlink-ext{
+  display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+  font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted);white-space:nowrap;
+  transition:color .2s;
+}
+.navlink-ext svg{width:13px;height:13px;}
+.navlink-ext:hover{color:var(--ink);}
+.navcta{
+  display:inline-flex;align-items:center;gap:12px;height:30px;padding:0 13px;
+  background:var(--black);color:#f1ece1;text-decoration:none;border-radius:2px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;white-space:nowrap;
+  transition:background .2s,transform .2s;
+}
+.navcta:hover{background:#2a2d38;}
+.navcta i{width:14px;height:1px;background:#f1ece1;position:relative;display:block;}
+.navcta svg{width:12px;height:12px;display:block;}
+.navcta i::after{content:"";position:absolute;right:0;top:-2px;width:4px;height:4px;border-top:1px solid #f1ece1;border-right:1px solid #f1ece1;transform:rotate(45deg);}
+
+/* ---------- page ---------- */
+#scenes{position:relative;z-index:2;}
+.scene{
+  position:relative;min-height:100vh;overflow:hidden;
+  padding:0 6vw;border-top:1px solid var(--rule-soft);
+}
+.scene:first-child{border-top:none;}
+#s0{background:var(--paper);}
+#s1{background:var(--paper-2);}
+#s2{background:var(--paper);}
+#s3{background:var(--paper-3);}
+#s4{background:var(--paper);}
+#s5{background:var(--paper-2);}
+#s6{background:var(--paper-4);}
+.copy{
+  position:relative;z-index:3;padding-top:15vh;
+  width:clamp(270px,27vw,420px);
+}
+.copy.right{margin-left:auto;width:clamp(260px,24vw,360px);}
+.copy.mid{width:clamp(300px,36vw,520px);}
+.copy.narrow{width:clamp(210px,22vw,330px);}
+.copy.tight{width:clamp(240px,24vw,380px);}
+.eyebrow{
+  display:flex;align-items:center;gap:12px;font-family:var(--mono);
+  font-size:9px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;
+}
+.eyebrow::before{content:"";width:28px;height:1px;background:currentColor;opacity:.55;flex:none;}
+h1,h2{margin:20px 0 0;font-family:var(--serif);font-weight:500;letter-spacing:-.015em;color:var(--ink);}
+h1{font-size:clamp(46px,5.1vw,80px);line-height:1.13;}
+h2{font-size:clamp(36px,3.45vw,55px);line-height:1.16;}
+.em{position:relative;color:var(--indigo);white-space:nowrap;}
+.em::after{
+  content:"";position:absolute;left:2%;right:0;bottom:.01em;height:2px;
+  background:currentColor;opacity:.28;transform:rotate(-.5deg);transform-origin:left;
+}
+.latin{
+  margin:-3px 0 17px;font-family:Georgia,"Times New Roman",serif;font-style:italic;
+  font-size:clamp(15px,1.22vw,19px);color:var(--indigo);letter-spacing:.01em;
+}
+.lede{
+  margin:20px 0 0;font-size:15.5px;line-height:1.9;color:#232c49;
+  max-width:400px;letter-spacing:.01em;
+}
+.hero-copy .lede{max-width:400px;}
+.specs{margin-top:clamp(24px,4vh,42px);width:min(100%,400px);}
+.spec{
+  display:grid;grid-template-columns:1fr auto;gap:18px;align-items:baseline;
+  border-top:1px solid var(--rule);padding:7px 0;
+  font-family:var(--mono);font-size:9.5px;line-height:1.5;letter-spacing:.06em;color:var(--muted);
+}
+.spec b{font-weight:400;color:var(--ink);text-align:right;letter-spacing:.02em;}
+.specs .cap{
+  display:flex;justify-content:space-between;font-family:var(--mono);
+  font-size:8.5px;letter-spacing:.16em;color:var(--muted);padding-bottom:7px;
+}
+.note{
+  margin-top:16px;font-family:var(--mono);font-size:9px;line-height:1.8;
+  letter-spacing:.03em;color:var(--muted);max-width:360px;
+}
+.note::before{content:"※ ";color:var(--indigo);}
+.dl{margin-top:clamp(22px,3.4vh,34px);width:min(100%,360px);}
+.dl .cap{
+  display:flex;justify-content:space-between;font-family:var(--mono);
+  font-size:8.5px;letter-spacing:.16em;color:var(--muted);padding-bottom:7px;
+}
+.dl-btn{
+  display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;margin-top:8px;
+  border:1px solid var(--rule);background:rgba(255,255,255,.4);text-decoration:none;
+  transition:border-color .2s,background .2s,transform .2s;
+}
+.dl-btn svg{width:15px;height:15px;color:var(--ink);flex:none;}
+.dl-btn .t{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;text-align:left;}
+.dl-btn .t b{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--ink);letter-spacing:.02em;}
+.dl-btn .t i{font-style:normal;font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;color:var(--muted);white-space:normal;line-height:1.5;}
+.dl-btn em{flex:none;font-style:normal;font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--indigo);white-space:nowrap;}
+.dl-btn.primary{border-color:rgba(56,53,140,.42);background:rgba(56,53,140,.06);}
+.dl-btn:hover{border-color:var(--indigo);transform:translateX(2px);}
+.dl-btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed;}
+.dl-btn[aria-disabled="true"]:hover{border-color:var(--rule);transform:none;}
+.dl-hint{
+  margin-top:10px;font-family:var(--mono);font-size:8.5px;line-height:1.85;
+  letter-spacing:.03em;color:var(--muted);max-width:360px;
+}
+.dl-hint b{font-weight:400;color:var(--ink);}
+.scrollhint{
+  display:flex;align-items:center;gap:10px;margin-top:clamp(24px,4vh,42px);
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:var(--muted);
+}
+.scrollhint i{display:block;width:44px;height:1px;background:var(--ink);opacity:.35;position:relative;overflow:hidden;}
+.scrollhint i::after{
+  content:"";position:absolute;inset:0;background:var(--ink);
+  transform:translateX(-100%);animation:trav .9s var(--ease) 1.6s infinite;
+}
+@keyframes trav{0%{transform:translateX(-100%);}55%,100%{transform:translateX(100%);}}
+.plate{
+  position:absolute;right:6vw;top:10vh;z-index:3;display:flex;align-items:center;gap:12px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;color:var(--muted);
+}
+.plate::after{content:"";width:34px;height:1px;background:var(--rule);}
+.pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:22px;}
+.pill{
+  display:inline-flex;align-items:center;height:26px;padding:0 11px;border:1px solid var(--rule);
+  border-radius:999px;font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;color:var(--ink-2);
+  background:var(--paper);
+}
+#s8 .pill{background:var(--paper-4);}
+.pill.accent{border-color:rgba(56,53,140,.38);color:var(--indigo);}
+.hero-copy{padding-top:14vh;width:clamp(300px,34.5vw,540px);}
+.hero-bottom{position:absolute;left:6vw;right:6vw;bottom:0;z-index:1;}
+.hero-line{
+  display:flex;justify-content:space-between;align-items:center;gap:24px;
+  border-top:1px solid var(--rule);padding:8px 0 11px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;color:var(--muted);
+}
+/* 巨字上的小字垫纸底，避免与背景大字融为一体 */
+.hero-line span{background:var(--paper);padding:3px 10px;}
+#s8 .hero-line span{background:var(--paper-4);}
+#s0 .scrollhint{background:var(--paper);padding:5px 12px;}
+.edge{
+  position:fixed;left:17px;bottom:22px;z-index:40;writing-mode:vertical-rl;
+  transform:rotate(180deg);pointer-events:none;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.22em;color:rgba(23,33,60,.62);
+  text-shadow:0 0 6px var(--paper),0 0 12px var(--paper),0 2px 10px var(--paper);
+}
+.giant{
+  margin:0 0 -.155em;font-family:Georgia,"Times New Roman",serif;font-weight:400;
+  font-size:clamp(180px,29.5vw,520px);line-height:.72;letter-spacing:-.045em;
+  color:var(--ink);white-space:nowrap;user-select:none;
+}
+.finale .giant{
+  font-family:var(--serif);font-weight:500;letter-spacing:-.03em;
+  font-size:clamp(170px,33vw,580px);margin-bottom:-.19em;
+}
+.finale .hero-line{margin-top:10px;}
+.rulewrap{border-top:1px solid var(--rule);width:100%;}
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .95s var(--ease),transform .95s var(--ease);}
+.scene.in .reveal{opacity:1;transform:none;}
+.scene.in .reveal.d1{transition-delay:.07s;}
+.scene.in .reveal.d2{transition-delay:.14s;}
+.scene.in .reveal.d3{transition-delay:.21s;}
+.scene.in .reveal.d4{transition-delay:.28s;}
+.scene-foot{
+  position:absolute;left:6vw;right:6vw;bottom:2.8vh;z-index:3;
+  display:flex;justify-content:space-between;align-items:center;gap:20px;
+  border-top:1px solid var(--rule);padding-top:8px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;color:var(--muted);
+}
+.scene-foot b{font-weight:400;color:var(--ink);}
+
+#stage{
+  position:fixed;inset:0;z-index:20;pointer-events:none;perspective:2400px;
+  perspective-origin:50% 50%;
+}
+#app{position:absolute;left:0;top:0;transform-origin:50% 50%;pointer-events:auto;will-change:transform;}
+#printout{
+  position:fixed;left:70vw;top:24vh;width:clamp(280px,21vw,320px);z-index:22;
+  background:#fff;color:#1c2024;border:1px solid rgba(20,24,32,.16);border-radius:3px;
+  box-shadow:0 34px 80px -24px rgba(23,25,22,.45),0 2px 8px rgba(23,25,22,.12);
+  padding:18px 18px 14px;pointer-events:auto;
+  opacity:0;transform:translateY(34px) rotate(-5deg) scale(.96);
+  transition:opacity .8s var(--ease),transform .9s var(--ease);
+  font-family:var(--sans);
+}
+#printout::before{
+  content:"";position:absolute;inset:8px -8px -8px 8px;background:#f8f6f0;
+  border:1px solid rgba(20,24,32,.1);border-radius:3px;z-index:-1;
+}
+#printout.show{opacity:1;transform:translateY(0) rotate(2.2deg) scale(1);}
+#printout .p-head{display:flex;align-items:center;gap:6px;font-size:10px;color:#5b636d;border-bottom:1px solid #eef0f3;padding-bottom:9px;}
+#printout .p-head img{width:16px;height:16px;border-radius:4px;}
+#printout .p-head b{color:#1c2024;font-size:11px;font-weight:600;}
+#printout .p-head .tag{margin-left:auto;font-family:var(--mono);font-size:7.5px;letter-spacing:.06em;color:#5b5bd6;background:#eeeefc;border-radius:3px;padding:2px 5px;}
+#printout .p-q{margin:11px 0 9px;font-size:9.5px;line-height:1.65;color:#3c4148;}
+#printout .p-fig{border:1px solid #eef0f3;border-radius:4px;background:#fff;padding:4px;}
+#printout .p-fig svg{display:block;width:100%;height:auto;}
+#printout .p-ans{display:flex;align-items:baseline;gap:8px;margin-top:10px;}
+#printout .p-ans span{font-size:8px;color:#98a0aa;font-family:var(--mono);letter-spacing:.1em;}
+#printout .p-ans b{font-family:Georgia,serif;font-size:21px;font-weight:400;color:#38358c;}
+#printout .p-ans b i{font-size:12px;}
+#printout .p-note{font-size:8.5px;line-height:1.7;color:#6b727c;margin-top:4px;}
+#printout .p-steps{margin-top:11px;border-top:1px solid #eef0f3;padding-top:8px;display:grid;gap:5px;}
+#printout .p-step{display:flex;gap:6px;font-size:8.5px;line-height:1.55;color:#4a5058;}
+#printout .p-step em{font-style:normal;color:#5b5bd6;font-family:var(--mono);font-size:7.5px;flex:none;padding-top:1px;}
+#printout .p-foot{display:flex;justify-content:space-between;gap:8px;border-top:1px dashed #e4e7ec;margin-top:11px;padding-top:8px;font-family:var(--mono);font-size:7px;letter-spacing:.05em;color:#98a0aa;}
+#dAnno{position:fixed;left:0;top:0;width:1px;height:1px;z-index:30;pointer-events:none;opacity:0;transition:opacity .3s;}
+#dAnno.show{opacity:1;}
+#dAnno .ring{
+  position:absolute;left:-10px;top:-10px;width:20px;height:20px;border-radius:50%;
+  border:1px solid rgba(56,53,140,.55);animation:annop 2.4s ease-in-out infinite;
+}
+@keyframes annop{0%,100%{transform:scale(1);opacity:.7;}50%{transform:scale(1.35);opacity:.25;}}
+#dAnno .leader{
+  position:absolute;left:9px;top:-7px;width:46px;height:1px;background:rgba(23,33,60,.55);
+  transform-origin:0 50%;transform:rotate(-52deg);
+}
+#dAnno .tag{
+  position:absolute;left:42px;top:-54px;white-space:nowrap;
+  background:var(--paper);border:1px solid var(--rule);padding:5px 8px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;color:var(--ink);
+  box-shadow:0 2px 10px rgba(23,33,60,.08);transform:rotate(-1.5deg);
+}
+#dAnno .tag::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--indigo);}
+#dAnno .dot-note{
+  position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:var(--indigo);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:1280px){
+  .brand .en{display:none;}
+  .navlinks{gap:12px;}
+  .navright{gap:10px;}
+}
+@media (max-width:1100px){
+  #nav{grid-template-columns:1fr auto;}
+  .navlinks{display:none;}
+  .copy,.copy.right,.copy.mid,.copy.narrow{width:min(72vw,440px);}
+  .copy.right{margin-left:0;}
+  .plate{display:none;}
+}
+@media (max-width:900px){
+  #nav{height:54px;padding:0 22px;}
+  .brand .en{display:none;}
+  .brand img{width:24px;height:24px;}
+  .navcta{height:28px;font-size:8px;padding:0 10px;}
+  .navlink-ext span{display:none;}
+  .navlink-ext svg{width:16px;height:16px;}
+  .scene{padding:0 22px;min-height:118vh;}
+  .copy,.copy.right,.copy.mid,.copy.tight,.copy.narrow,.hero-copy{width:100%;padding-top:11vh;}
+  .specs,.note{display:none;}
+  .lede{font-size:14px;line-height:1.85;}
+  h1{font-size:clamp(38px,10.6vw,54px);}
+  h2{font-size:clamp(33px,9vw,46px);}
+  .lede{max-width:34em;}
+  .dl{width:100%;}
+  .dl-btn .t b{font-size:14px;}
+  .latin{font-size:15px;}
+  .specs{margin-top:22px;width:100%;}
+  .hero-bottom{left:22px;right:22px;}
+  .giant{font-size:33vw;}
+  .finale .giant{font-size:38vw;}
+  .hero-line span:nth-child(2){display:none;}
+  .edge{display:none;}
+  .scene-foot{display:none;}
+  #printout{display:none;}
+  #dAnno{display:none;}
+  .scrollhint{margin-top:20px;}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto;}
+  .reveal{transition:none;opacity:1;transform:none;}
+  .scrollhint i::after{animation:none;}
+  #dAnno .ring{animation:none;}
+  #app{transition:none;}
+}
+</style>
+<style>
+/* ============ app shell ============ */
+#app{
+  width:1240px;height:800px;border-radius:12px;overflow:hidden;
+  background:var(--p-bg);color:var(--p-txt);
+  font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:13px;
+  border:1px solid rgba(18,22,30,.22);
+  box-shadow:0 2px 0 rgba(255,255,255,.35) inset,0 44px 90px -30px rgba(27,25,20,.55),0 12px 28px rgba(27,25,20,.16);
+  display:flex;flex-direction:column;user-select:none;
+  --p-bg:#f4f5f7;--p-panel:#fff;--p-soft:#fbfbfd;--p-line:#e4e7ec;--p-line2:#eef0f3;
+  --p-txt:#1c2024;--p-txt2:#5b636d;--p-txt3:#98a0aa;--p-hover:#f1f2f5;--p-paper:#fff;
+  --p-accent:#5b5bd6;--p-accent-h:#4a4ac4;--p-accent2:#eeeefc;--p-ok:#12a150;--p-warn:#e8590c;
+  --p-hi-a:#f5f5fe;--p-hi-b:#e4e4f8;--p-shadow:0 2px 8px rgba(20,24,32,.06);
+}
+#app.dark{
+  --p-bg:#0f1115;--p-panel:#181b21;--p-soft:#1b1f26;--p-line:#2c313b;--p-line2:#242a33;
+  --p-txt:#e9ebef;--p-txt2:#aab1bc;--p-txt3:#6f7885;--p-hover:#232831;--p-paper:#fff;
+  --p-accent:#7c7cf0;--p-accent-h:#8d8df3;--p-accent2:#232848;--p-ok:#31c476;
+  --p-hi-a:#1b2140;--p-hi-b:#2b3361;--p-shadow:0 2px 8px rgba(0,0,0,.3);
+  border-color:rgba(255,255,255,.12);
+  box-shadow:0 0 0 1px rgba(255,255,255,.04) inset,0 44px 90px -30px rgba(0,0,0,.75),0 12px 28px rgba(0,0,0,.3);
+}
+#app svg.ai,#app svg.ai-sm{
+  fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  flex:none;vertical-align:-.16em;pointer-events:none;
+}
+#app svg.ai{width:15px;height:15px;}
+#app svg.ai-sm{width:13px;height:13px;}
+#app .sp{flex:1;min-width:0;}
+#app button{font-family:inherit;}
+
+/* topbar */
+.a-top{height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:var(--p-panel);border-bottom:1px solid var(--p-line);}
+.a-logo{width:28px;height:28px;flex:none;border-radius:8px;overflow:hidden;}
+.a-logo img{width:100%;height:100%;display:block;}
+.a-brand{font-size:15px;font-weight:600;letter-spacing:.2px;margin-right:2px;}
+.a-chip{
+  height:28px;display:inline-flex;align-items:center;gap:6px;padding:0 9px;border-radius:7px;
+  background:#f1fbf5;border:1px solid #c9ecd8;color:#20603a;font-size:11.5px;cursor:pointer;white-space:nowrap;
+}
+.a-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--p-ok);box-shadow:0 0 0 3px rgba(18,161,80,.14);flex:none;}
+.a-sel{
+  height:28px;display:flex;align-items:center;gap:6px;padding:0 9px;border:1px solid var(--p-line);
+  border-radius:7px;background:var(--p-panel);font-size:11.5px;color:var(--p-txt3);white-space:nowrap;cursor:pointer;
+}
+.a-sel b{font-weight:400;color:var(--p-txt2);}
+.a-sel svg{width:10px;height:10px;opacity:.6;}
+.a-tbtn{
+  height:32px;padding:0 12px;border:1px solid var(--p-line);border-radius:8px;background:var(--p-panel);
+  color:var(--p-txt2);font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;
+  transition:background .12s,color .12s;
+}
+.a-tbtn:hover{background:var(--p-hover);color:var(--p-txt);}
+.a-tbtn.ico{width:32px;padding:0;justify-content:center;}
+.a-tbtn .sun{display:none;}
+#app.dark .a-tbtn .sun{display:block;}
+#app.dark .a-tbtn .moon{display:none;}
+
+/* input */
+.a-inputrow{flex:none;height:76px;display:flex;gap:10px;padding:10px 14px;background:var(--p-panel);border-bottom:1px solid var(--p-line);transition:height .25s var(--ease);}
+.a-inputcol{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;}
+.a-qbox{
+  height:56px;flex:none;border:1px solid var(--p-line);border-radius:9px;background:var(--p-soft);
+  padding:8px 12px;overflow:hidden;position:relative;
+}
+.a-qbox:focus-within{border-color:var(--p-accent);box-shadow:0 0 0 3px rgba(91,91,214,.10);}
+.a-qtext{font-size:12.5px;line-height:1.55;color:var(--p-txt);white-space:normal;}
+.a-qtext .q3d{display:none;}
+#app[data-state="3d"] .a-qtext .q2d{display:none;}
+#app[data-state="3d"] .a-qtext .q3d{display:inline;}
+.a-caret{display:inline-block;width:1px;height:13px;background:var(--p-accent);vertical-align:-2px;margin-left:2px;animation:caret 1.2s steps(1,end) infinite;}
+@keyframes caret{0%,55%{opacity:1;}56%,100%{opacity:0;}}
+.a-solve{
+  flex:none;width:96px;height:44px;margin-top:6px;border:none;border-radius:9px;background:var(--p-accent);color:#fff;
+  font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;
+  box-shadow:0 3px 8px rgba(91,91,214,.22);transition:background .12s,filter .12s;
+}
+.a-solve:hover{background:var(--p-accent-h);}
+.a-solve:active{scale:.97;}
+.a-progwrap{display:none;flex:none;padding:0 2px;}
+#app.solving .a-progwrap{display:flex;flex-direction:column;gap:3px;}
+#app.solving .a-inputrow{height:102px;}
+.a-progrow{display:flex;justify-content:space-between;gap:12px;font-size:10.5px;color:var(--p-txt2);line-height:1.4;}
+.a-progrow span:last-child{font-variant-numeric:tabular-nums;color:var(--p-accent);font-weight:600;}
+.a-track{height:3px;border-radius:2px;background:var(--p-line2);overflow:hidden;}
+.a-track i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--p-accent),#7c7cf0);border-radius:2px;transition:width .15s linear;}
+
+/* main */
+.a-main{flex:1;min-height:0;display:flex;position:relative;}
+.a-left{width:224px;flex:none;min-height:0;display:flex;flex-direction:column;background:var(--p-panel);overflow:hidden;}
+.a-split{flex:none;width:5px;cursor:col-resize;position:relative;background:transparent;}
+.a-split::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:1px;height:30px;background:var(--p-line2);}
+.a-split:hover{background:rgba(91,91,214,.08);}
+.a-ph{height:38px;flex:none;display:flex;align-items:center;gap:7px;padding:0 8px 0 14px;border-bottom:1px solid var(--p-line2);}
+.a-ph-t{font-size:13px;font-weight:700;letter-spacing:.2px;}
+.a-ph-n{font-size:10.5px;color:var(--p-txt3);background:var(--p-hover);border-radius:9px;padding:0 6px;line-height:16px;min-width:16px;text-align:center;font-variant-numeric:tabular-nums;}
+.a-iconbtn{width:28px;height:28px;border:none;background:none;border-radius:6px;color:var(--p-txt3);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
+.a-iconbtn:hover{background:var(--p-hover);color:var(--p-txt);}
+.a-seg{display:flex;gap:3px;padding:6px 8px;border-bottom:1px solid var(--p-line2);flex:none;}
+.a-seg button{flex:1;height:27px;border:none;background:none;border-radius:6px;font-size:11.5px;color:var(--p-txt3);cursor:pointer;}
+.a-seg button:hover{background:var(--p-hover);color:var(--p-txt2);}
+.a-seg button.on{background:var(--p-accent2);color:var(--p-accent);font-weight:600;}
+.a-objs{flex:1;min-height:0;overflow:hidden;padding:3px 0;}
+.a-obj{display:flex;align-items:center;gap:8px;min-height:32px;padding:3px 6px 3px 12px;border-left:2px solid transparent;cursor:pointer;}
+.a-obj:hover{background:var(--p-hover);}
+.a-obj.on{background:var(--p-accent2);border-left-color:var(--p-accent);}
+.a-obj .cdot{width:9px;height:9px;border-radius:50%;flex:none;border:1px solid rgba(0,0,0,.08);}
+.a-obj .cdot.sq{border-radius:2px;}
+.a-obj .nm{font-size:12px;font-weight:600;flex:none;max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.a-obj .df{font-size:10.5px;color:var(--p-txt3);flex:1;min-width:0;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.a-obj .act{width:24px;height:24px;flex:none;border:none;background:none;border-radius:5px;color:var(--p-txt3);opacity:0;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;}
+.a-obj:hover .act,.a-obj.on .act{opacity:1;}
+.a-obj .act:hover{background:var(--p-hover);color:var(--p-txt);}
+.a-empty{padding:22px 16px;font-size:11.5px;line-height:1.7;color:var(--p-txt3);text-align:center;}
+.a-lf{flex:none;border-top:1px solid var(--p-line2);padding:9px 14px 11px;}
+#app[data-state="input"] .a-lf,#app[data-state="3d"] .a-lf{display:none;}
+.a-lbl{font-size:10px;color:var(--p-txt3);letter-spacing:.5px;margin-bottom:7px;}
+.a-sld-top{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--p-txt2);margin-bottom:1px;}
+.a-sld-val{color:var(--p-accent);font-weight:600;font-variant-numeric:tabular-nums;}
+.a-lf input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:14px;background:transparent;cursor:pointer;margin:0;}
+.a-lf input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--p-line);}
+.a-lf input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--p-accent);margin-top:-4px;box-shadow:0 1px 3px rgba(0,0,0,.22);}
+
+/* canvas */
+.a-canvas{flex:1;min-width:0;position:relative;background:var(--p-paper);overflow:hidden;}
+.a-svg2d,.a-svg3d{position:absolute;inset:0;width:100%;height:100%;display:block;}
+.a-svg3d{display:none;touch-action:none;cursor:grab;}
+#app[data-state="3d"] .a-svg2d{display:none;}
+#app[data-state="input"] .a-svg2d{display:none;}
+#app[data-state="3d"] .a-svg3d{display:block;}
+.a-stageTop{position:absolute;left:12px;right:12px;top:12px;z-index:12;display:flex;align-items:flex-start;gap:10px;pointer-events:none;}
+.a-toolbar{margin-left:auto;display:flex;align-items:center;gap:1px;padding:3px;background:rgba(255,255,255,.97);border:1px solid #e4e7ec;border-radius:9px;box-shadow:0 2px 8px rgba(20,24,32,.06);backdrop-filter:blur(6px);pointer-events:auto;}
+.a-toolbar button{width:31px;height:31px;border:none;background:none;border-radius:7px;cursor:pointer;color:#5b636d;display:flex;align-items:center;justify-content:center;padding:0;}
+.a-toolbar button svg{width:16px;height:16px;}
+.a-toolbar button:hover{background:#f1f2f5;color:#1c2024;}
+.a-toolbar button.on{background:#eaf3ff;color:#1890ff;}
+.a-toolbar .a-vsep{width:1px;height:16px;background:#e4e7ec;margin:0 2px;}
+.a-measure{
+  position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:11;display:none;align-items:center;gap:6px;
+  background:rgba(255,255,255,.97);border:1px solid #e4e7ec;border-radius:9px;box-shadow:0 2px 8px rgba(20,24,32,.06);
+  padding:6px 12px;font-size:12px;color:#5b636d;white-space:nowrap;backdrop-filter:blur(6px);
+}
+#app:not([data-state="input"]) .a-measure{display:flex;}
+.a-measure b{color:var(--p-accent);font-weight:600;font-variant-numeric:tabular-nums;margin-left:4px;}
+.a-measure .m-dot{width:6px;height:6px;border-radius:50%;background:#5b5bd6;flex:none;}
+#app[data-state="3d"] .a-measure b{color:#b35400;}
+.a-welcome{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(390px,72%);z-index:4;
+  border:1px dashed #d7dbe2;border-radius:14px;background:rgba(255,255,255,.72);
+  padding:24px 22px;text-align:center;display:none;flex-direction:column;align-items:center;
+}
+#app[data-state="input"] .a-welcome{display:flex;}
+.a-welcome .wico{width:48px;height:48px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--p-accent2);color:var(--p-accent);}
+.a-welcome .wico svg{width:26px;height:26px;}
+.a-welcome .wt{font-size:15px;font-weight:600;color:var(--p-txt);}
+.a-welcome .ws{font-size:11.5px;color:var(--p-txt3);margin-top:6px;}
+.a-welcome .wbtns{display:flex;gap:8px;margin-top:16px;}
+.a-welcome .wbtns button{height:32px;padding:0 13px;border-radius:8px;font-size:11.5px;cursor:pointer;}
+.a-welcome .wbtns .p{border:none;background:var(--p-accent);color:#fff;}
+.a-welcome .wbtns .g{border:1px solid var(--p-line);background:var(--p-panel);color:var(--p-txt2);}
+
+/* 2d figure */
+#g2dGrid .gl{stroke:#eef0f3;stroke-width:1;}
+#g2dGrid .ax{stroke:#c9ced6;stroke-width:1.15;}
+#g2dGrid .tk{stroke:#c9ced6;stroke-width:1;}
+#g2dGrid text{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:10px;fill:#98a0aa;}
+.a-fig .tri-fill{fill:rgba(91,91,214,.055);transition:fill .3s;}
+.a-fig .edge{fill:none;stroke:#1c2024;stroke-width:2.2;stroke-linecap:round;}
+.a-fig .rightangle{fill:none;stroke:#1c2024;stroke-width:1.3;}
+.a-fig #lineCD{stroke:#5b5bd6;stroke-width:2.2;stroke-linecap:round;transition:stroke-width .25s,filter .25s;}
+.a-fig .pt{fill:#1c2024;stroke:#fff;stroke-width:1.5;}
+.a-fig .pt.d{fill:#5b5bd6;}
+.a-fig .lbl{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:13px;font-weight:600;fill:#1c2024;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round;}
+.a-fig .tick{stroke:#1c2024;stroke-width:1.4;stroke-linecap:round;transition:opacity .2s;}
+.a-fig #ticks{opacity:0;transition:opacity .25s;}
+#app[data-step="2"] .a-fig #ticks,#app[data-step="3"] .a-fig #ticks,#app[data-step="4"] .a-fig #ticks{opacity:1;}
+.a-fig #hitD{fill:transparent;cursor:grab;touch-action:none;}
+.a-fig #hitD:active{cursor:grabbing;}
+.a-fig .cdtag rect{fill:#fff;stroke:#dcdcf8;rx:4;}
+.a-fig .cdtag text{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:10px;font-weight:600;fill:#5b5bd6;}
+#app[data-step="1"] .a-fig #lineCD{opacity:.34;}
+#app[data-step="3"] .a-fig #lineCD{stroke-width:3.4;filter:drop-shadow(0 0 4px rgba(91,91,214,.45));}
+#app[data-step="3"] .a-fig #midCircle{opacity:.26;transition:opacity .3s;}
+#app[data-step="1"] .a-fig .tri-fill{fill:rgba(91,91,214,.10);}
+#app[data-step="2"] .a-fig #edgeAB{stroke-width:3;}
+#app[data-step="3"] .a-measure{box-shadow:0 0 0 2px rgba(91,91,214,.12),0 2px 8px rgba(20,24,32,.06);}
+@keyframes ptpulse{0%,100%{r:6;}50%{r:8;}}
+#app[data-step="2"] .a-fig .pt.d{animation:ptpulse 1.6s ease-in-out infinite;}
+
+/* step bar */
+.a-stepbar{
+  position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:8;
+  display:none;align-items:center;gap:4px;max-width:calc(100% - 28px);padding:4px 6px;
+  background:rgba(255,255,255,.97);border:1px solid #e4e7ec;border-radius:10px;
+  box-shadow:0 2px 8px rgba(20,24,32,.06);backdrop-filter:blur(6px);white-space:nowrap;
+}
+#app:not([data-state="input"]) .a-stepbar{display:flex;}
+.a-stepbar .nav{display:flex;gap:1px;flex:none;}
+.a-stepbar .nav button{width:29px;height:29px;border:none;background:none;border-radius:6px;color:#5b636d;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;}
+.a-stepbar .nav button:hover{background:#f1f2f5;}
+.a-stepbar .nav button:disabled{color:#d5dae0;}
+.a-stepbar .idx{font-size:10.5px;color:#98a0aa;padding:0 1px;font-variant-numeric:tabular-nums;}
+.a-stepbar .sttl{font-size:11.5px;font-weight:600;max-width:190px;overflow:hidden;text-overflow:ellipsis;padding:0 3px;}
+.a-stepbar .play{height:29px;padding:0 11px;border:none;border-radius:6px;background:#5b5bd6;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;}
+.a-stepbar .play svg{width:13px;height:13px;}
+.a-stepbar .exp{width:27px;height:29px;border:none;background:none;border-radius:6px;color:#98a0aa;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;}
+.a-stepbar .exp:hover{background:#f1f2f5;color:#1c2024;}
+.a-stepdesc{
+  position:absolute;left:50%;bottom:58px;transform:translateX(-50%);z-index:8;display:none;
+  width:min(500px,calc(100% - 36px));background:rgba(255,255,255,.98);border:1px solid #e4e7ec;
+  border-radius:11px;box-shadow:0 12px 40px rgba(20,24,32,.18);padding:11px 14px;
+  font-size:11.5px;line-height:1.75;color:#33383f;backdrop-filter:blur(6px);
+}
+.a-stepdesc.show{display:block;}
+.a-stepdesc b{color:#5b5bd6;font-weight:600;}
+.a-qfloat{
+  position:absolute;left:12px;bottom:12px;z-index:7;height:30px;display:flex;align-items:center;gap:6px;
+  padding:0 10px;background:rgba(255,255,255,.97);border:1px solid #e4e7ec;border-radius:8px;
+  box-shadow:0 2px 8px rgba(20,24,32,.06);font-size:11px;color:#5b636d;backdrop-filter:blur(6px);
+}
+#app[data-state="3d"] .a-qfloat,#app[data-state="input"] .a-qfloat{display:none;}
+
+/* right panel */
+.a-right{width:380px;flex:none;min-height:0;display:flex;flex-direction:column;background:var(--p-panel);overflow:hidden;}
+.a-rhead{height:38px;flex:none;display:flex;align-items:center;gap:7px;padding:0 10px 0 14px;border-bottom:1px solid var(--p-line2);font-size:13px;font-weight:700;letter-spacing:.2px;}
+.a-rbody{flex:1;min-height:0;overflow:auto;padding:12px 14px 14px;scrollbar-width:thin;}
+.a-rbody::-webkit-scrollbar{width:6px;}
+.a-rbody::-webkit-scrollbar-thumb{background:var(--p-line);border-radius:3px;}
+.a-meta{font-size:10.5px;color:var(--p-txt3);line-height:1.8;padding:0 2px 9px;border-bottom:1px dashed var(--p-line);margin-bottom:11px;}
+.a-meta b{color:var(--p-txt2);font-weight:600;font-variant-numeric:tabular-nums;}
+.a-card{background:var(--p-soft);border:1px solid var(--p-line2);border-radius:10px;padding:10px 12px;margin-bottom:11px;}
+.a-card.hi{background:linear-gradient(180deg,var(--p-hi-a),var(--p-soft));border-color:var(--p-hi-b);}
+.a-cardh{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.2px;margin-bottom:8px;}
+.a-cardh::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--p-accent);flex:none;}
+.a-cardh .sp{flex:1;}
+.a-locate{height:24px;padding:0 8px;border:1px solid #ffe0c2;background:#fff8f0;color:#b35400;border-radius:6px;font-size:10.5px;display:flex;align-items:center;gap:4px;cursor:pointer;}
+.a-answer{font-family:Georgia,"Times New Roman",serif;font-size:22px;line-height:1.3;color:var(--p-txt);}
+.a-answer b{color:var(--p-accent);font-weight:600;}
+.a-answer i{font-style:italic;}
+.a-ansub{font-size:10.5px;line-height:1.65;color:var(--p-txt3);margin-top:5px;}
+.a-ab{
+  display:flex;gap:8px;padding:6px 8px;border-radius:4px;border-left:2px solid transparent;
+  font-size:11.5px;line-height:1.7;color:var(--p-txt2);margin:2px 0;
+}
+.a-ab .tag{font-family:var(--mono);font-size:9.5px;color:var(--p-txt3);flex:none;padding-top:1px;}
+.a-ab em{font-family:Georgia,"Times New Roman",serif;font-style:italic;color:var(--p-txt);}
+.a-ab.active{background:var(--p-accent2);border-left-color:var(--p-accent);color:var(--p-txt);}
+.a-ab.active .tag{color:var(--p-accent);}
+.a-ab.key{background:rgba(91,107,255,.06);border-left-color:#5b6bff;}
+.a-placeholder{font-size:12px;color:var(--p-txt3);padding:2px 0 4px;}
+.a-refine{flex:none;border-top:1px solid var(--p-line2);background:var(--p-panel);padding:9px 12px 10px;}
+.a-ref-head{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--p-txt);margin-bottom:7px;}
+.a-ref-head svg{width:13px;height:13px;color:var(--p-accent);}
+.a-ref-head .chev{margin-left:auto;color:var(--p-txt3);}
+.a-ref-row{display:flex;align-items:center;gap:5px;}
+.a-ref-sel{height:26px;display:flex;align-items:center;gap:4px;padding:0 7px;border:1px solid var(--p-line);border-radius:6px;font-size:10.5px;color:var(--p-txt2);background:var(--p-panel);white-space:nowrap;}
+.a-ref-sel svg{width:9px;height:9px;opacity:.55;}
+.a-ref-input{flex:1;height:26px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--p-line);border-radius:6px;background:var(--p-soft);font-size:10.5px;color:var(--p-txt3);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.a-ref-btn{flex:none;height:26px;padding:0 10px;border:none;border-radius:6px;background:var(--p-accent);color:#fff;font-size:10.5px;display:flex;align-items:center;gap:3px;cursor:pointer;}
+.a-ref-foot{display:flex;justify-content:space-between;gap:8px;font-size:9px;color:var(--p-txt3);margin-top:5px;}
+.a-onlyinput,.a-only2d,.a-only3d,.a-onlychat{display:none;}
+#app[data-state="input"] .a-onlyinput{display:block;}
+#app[data-state="2d"] .a-only2d{display:block;}
+#app[data-state="3d"] .a-only3d{display:block;}
+#app[data-state="chat"] .a-onlychat{display:block;}
+/* 对话气泡（追问 / 微调） */
+.a-msg{margin:8px 0;display:flex;flex-direction:column;gap:3px;}
+.a-msg span{font-size:11px;line-height:1.65;padding:7px 10px;border-radius:9px;max-width:94%;}
+.a-msg.me{align-items:flex-end;}
+.a-msg.me span{background:var(--p-accent2);color:var(--p-accent);border:1px solid rgba(91,91,214,.25);border-bottom-right-radius:3px;}
+.a-msg.bot span{background:var(--p-soft);color:var(--p-txt);border:1px solid var(--p-line);border-bottom-left-radius:3px;}
+.a-msg em{font-style:normal;font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;color:var(--p-txt3);}
+/* 微调面板（预览确认 + 版本切换） */
+#app[data-state="refine"] .a-onlyref{display:block;}
+.a-refine-q{font-size:11px;line-height:1.6;color:var(--p-txt2);background:var(--p-soft);border:1px solid var(--p-line);border-radius:8px;padding:6px 9px;margin-bottom:7px;}
+.a-diff{border:1px solid var(--p-line);border-radius:8px;overflow:hidden;margin-bottom:8px;}
+.a-diff-row{display:flex;align-items:baseline;gap:8px;padding:6px 9px;font-size:10.5px;line-height:1.5;}
+.a-diff-row span{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;color:var(--p-txt3);flex:none;}
+.a-diff-row b{font-weight:600;}
+.a-diff-row.old{background:rgba(228,90,36,.05);color:#a4502a;}
+.a-diff-row.old b{font-weight:400;text-decoration:line-through;text-decoration-color:rgba(164,80,42,.45);}
+.a-diff-row.new{background:rgba(91,91,214,.06);color:var(--p-accent);border-top:1px solid var(--p-line);}
+.a-ref-actions{display:flex;gap:6px;}
+.a-ref-actions button{height:26px;padding:0 12px;border-radius:6px;font-size:10.5px;cursor:pointer;border:1px solid var(--p-line);background:var(--p-panel);color:var(--p-txt2);}
+.a-ref-actions .keep{background:var(--p-accent);border-color:var(--p-accent);color:#fff;}
+.a-vtabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px;}
+.a-vtabs button{height:24px;padding:0 9px;border:1px solid var(--p-line);border-radius:6px;background:var(--p-panel);color:var(--p-txt2);font-size:10px;cursor:pointer;}
+.a-vtabs button.on{background:var(--p-accent);border-color:var(--p-accent);color:#fff;}
+.a-vnote{font-size:10px;line-height:1.6;color:var(--p-txt3);}
+
+/* status + toast */
+.a-status{flex:none;height:28px;display:flex;align-items:center;gap:14px;padding:0 12px;background:var(--p-panel);border-top:1px solid var(--p-line);font-size:10.5px;color:var(--p-txt3);}
+.a-status .ok{display:flex;align-items:center;gap:5px;color:var(--p-txt2);}
+.a-status .ok::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--p-ok);}
+.a-status .sp{flex:1;}
+.a-toast{
+  position:absolute;left:50%;bottom:46px;transform:translate(-50%,8px);z-index:40;
+  background:#1f2937;color:#fff;font-size:11.5px;line-height:1.4;padding:8px 14px;border-radius:8px;
+  box-shadow:0 10px 32px rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+  max-width:80%;white-space:nowrap;
+}
+.a-toast.show{opacity:1;transform:translate(-50%,0);}
+#app.dark .a-toolbar,#app.dark .a-measure,#app.dark .a-stepbar,#app.dark .a-stepdesc,#app.dark .a-qfloat{background:rgba(24,27,33,.97);border-color:#2c313b;color:var(--p-txt2);}
+#app.dark .a-toolbar button{color:#aab1bc;}
+#app.dark .a-toolbar button.on{background:#1e2a3d;color:#67a8ff;}
+#app.dark .a-welcome{background:rgba(24,27,33,.75);border-color:#3a404c;}
+#app.dark .a-stepbar .sttl{color:var(--p-txt);}
+</style>
+</head>
+<body>
+<div id="grain"></div>
+<div id="progress"></div>
+
+<header id="nav">
+  <a class="brand" href="#s0" data-nav="0">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVnSURBVFhH7VbbbxRVHMYHo9FnH3zAxMT4TyhUkEKv9M7uXHd71RbaNOHFYGkVShNoC0WguAXv+CKIUSGgUZBiFJTubndmd/YO3e6WblvbUihtAfOZc3ZmOjtb6T7ywC/5smfO5fu+8zu/ObNr1jyNJzlaW30v19ZGLXZ7uE3g/F0M4+3iCDili+PUtgFknLGkxm22YHttdYRvbAytNfNmFTYhuJdnQzM2IQ67OAa7MEZ/baSt/tqEBAUd1/oFrZ88JyBw4bsiH+xxOG48a9ZYMQA8w7PK2Rr7JDgmCMYip8FKsE2DBEuVRNvGceN8wlFjn4LAKj87HFjdhMDJ7WQBJVNFNFIqrotIKCsZpqBzVBN0jckEAeEUeanXrJcWzc3Blxird17buXG3ac8WGUUFbvR238Kh3hEU5rvTDJrFSR9rDYBjlIctLZFXzLp6iKLMkPNbicAoXlHmoRm4P/8ICwuPwFq1PrO4N7Ve3USqRnz1Zl09RF7uIMWjLTLvSuvLy3Xhh+8nkEwuYnb2Ic79OIm8zSQLXnVuSlhfrxog3KLg22/W1UPg5P1aBnTRNBIJxYXDaNsVgd9/D8f7RzHgSEBR7qG9LULHtCwZhZcNkLdCPmzW1cNu8x4kkzQSY/oItlVKKCkeRjg8jw87oujtGcHhvhjad0cRidynY2SOvsaUDcLNW+U+s64emgEtlUZxQpC/xY3PPxuDyzWH9W8MYcARxycnE7TtHJrDl1+MqUexnIEMA2xWBjJTSIqsxu5DMrmEHdsD2LTRpRvI3ehEU2MA4+NLdE55qSfDPDGStQHj4hQkWniDgzP47uwEtuS6UJTvxrGjMTiOx+lrSHZ+5vQEfr86g7zNLv1uWDaQZQZEPp6xuLjQjbb3w4jHF+kZV1VI1MDpb8Zx9tskNbCtQqb9o7EFdOw2FKQBKQO+xxuw8ekZIFft1iI3QqF59B2MoTB/mIrX1/qgRUO9gqKCYYqe7hGEQ/PYWjQMS5UMRq2DZQOrZMB4BKnCc2Hg4zi88j0U5LlpITbUKbjy2zSmph5QDF6Zxjv1CvI3u1CwxQ3JcxcnTyRom6Y/LQOrGTBkoLLcA46RaeG1NAewacMQNSNJd+ldcOSjGPqPjWLXe+GU6EAcuW87saMpgOT4EgTWi8ry5ePM4giUtAyQwjt/bpIWHjFy7c9ZXLz4D3jWi7fWO/W3IGedExzrxYULU7h+bRY8I+HM6SR+ujBFi5PyWchVvIqBGvuygdKtHrTs8GN0dAFfn7oNp3MO+zpv0iOorEjdiCcGEtQAaZMCJGOde27C5ZzDqa9u04JsbQlSrqwyUC0qvdoRkMr+6/odTEwsURFSVGTXRIwgZ90Qjh6J4Xh/HDlvDun9G3KcdO6nJxOYSC7hxt93KJdm4LFXMc/6OokBQtC5J0orPJFYpMdw+dI0rg7O0LuA4NKv04iE5xGN3MelX6ZT/Vdm6Bwy9/y5KSTii5SDZI5wkn9VIu87YNbVQ+C8NeSLVVUu0dR1tEexd89N9HTHKLoPjFCQdm9PDF37blFybSx9zgg9jg/ao2htCaCyzEMN2ATPu2ZdPRobpbWsxfeQswZo9ZYUe1RIKNXbWaBIhfpcUSaBtfrBWHz/1tX5XzXrpgXPeA5V2ybVCyTzi2iEdsH8H7RvALlZCafAyv1mvYxobg4+x1u9l8kC1uLPIKWoWqFPEzU9k50TLp5V/mhouPGCWW/F6LBdfl7klWMcE1yy8WMghUkqmEAkbRWkrUHr06D9jeeY0AORDw7s3Ol+0ayzajQ1hV6zi6E6gffvs4veQ9WCr88m+Pq038eCU7rqqqMN2+sir5t5n8YTFf8BtgeOJsmQIo0AAAAASUVORK5CYII=" alt="">
+    <span class="zh">何解</span>
+    <span class="en">HEGY / AI GEOMETRY SOLVER</span>
+  </a>
+  <nav class="navlinks" aria-label="演示章节">
+    <a href="#s0" data-nav="0"><span>00</span>封面</a>
+    <a href="#s1" data-nav="1"><span>01</span>输入</a>
+    <a href="#s2" data-nav="2"><span>02</span>图形</a>
+    <a href="#s3" data-nav="3"><span>03</span>立体</a>
+    <a href="#s4" data-nav="4"><span>04</span>解答</a>
+    <a href="#s5" data-nav="5"><span>05</span>微调</a>
+    <a href="#s6" data-nav="6"><span>06</span>追问</a>
+    <a href="#s7" data-nav="7"><span>07</span>带走</a>
+  </nav>
+  <div class="navright">
+    <a class="navlink-ext" href="https://github.com/kidnappe/hegy" target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#i-github"/></svg><span>GitHub</span></a>
+    <a class="navlink-ext" href="https://afdian.com/a/zhouxuano6" target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#i-heart"/></svg><span>爱发电</span></a>
+    <a class="navcta" href="#s8"><svg aria-hidden="true"><use href="#i-download"/></svg>DOWNLOAD</a>
+  </div>
+</header>
+
+<main id="scenes">
+  <section class="scene hero" id="s0" data-scene="0">
+    <div class="plate">PLATE 00 — COVER</div>
+    <div class="copy hero-copy">
+      <div class="eyebrow reveal">何解 HEGY / 本地运行的 AI 几何解题器</div>
+      <h1 class="reveal d1">一道题，<br>从文字走到<span class="em">图形</span>。</h1>
+      <div class="latin reveal d1">A problem, made palpable.</div>
+      <p class="lede reveal d2">贴一道题进去——文字或截图——得到一个可以拖动、旋转、分步讲的图形。整条链路跑在你自己的电脑上：模型接口自己填，解题记录自己存，导出离线可用。本页用同一道题，从输入走到导出。</p>
+      <div class="pills reveal d3">
+        <span class="pill">2D / 3D</span>
+        <span class="pill">可拖点</span>
+        <span class="pill">本地运行</span>
+        <span class="pill accent">开源 AGPL-3.0</span>
+        <span class="pill">离线导出</span>
+      </div>
+      <div class="scrollhint reveal d4"><i></i>SCROLL TO TRAVEL</div>
+    </div>
+    <div class="hero-bottom">
+      <div class="hero-line">
+        <span>何解 · DYNAMIC GEOMETRY</span>
+        <span>首发 v1.2.0 / 2026</span>
+        <span>一个界面，走完整页</span>
+      </div>
+      <div class="giant">HEGY</div>
+    </div>
+  </section>
+
+  <section class="scene" id="s1" data-scene="1">
+    <div class="plate">PLATE 01 — INPUT</div>
+    <div class="copy">
+      <div class="eyebrow reveal">01 — 输入 / INPUT</div>
+      <h2 class="reveal d1">题目，<br><span class="em">原样</span>贴进来。</h2>
+      <div class="latin reveal d1">Paste it, as it is.</div>
+      <p class="lede reveal d2">文字、截图、多张图片都可以。年级与图形类型可选；不选，就交给模型判断。提交是异步的，进度会一直写在这里。</p>
+      <div class="specs reveal d3">
+        <div class="cap"><span>VERIFIED / 界面实测</span><span>INPUT</span></div>
+        <div class="spec"><span>文字上限</span><b>1000 字</b></div>
+        <div class="spec"><span>题目图片</span><b>最多 6 张</b></div>
+        <div class="spec"><span>年级</span><b>初一 — 高三</b></div>
+        <div class="spec"><span>图形类型</span><b>自动 / 2D / 3D</b></div>
+        <div class="spec"><span>快捷提交</span><b>Ctrl + Enter</b></div>
+      </div>
+      <p class="note reveal d4">点击应用里的「解题」，可以重放一次处理进度。</p>
+    </div>
+    <div class="scene-foot"><span><b>01 / INPUT</b> — 异步任务 · SSE 实时进度 · Ctrl + Enter</span><span>01 / 08</span></div>
+  </section>
+
+  <section class="scene" id="s2" data-scene="2">
+    <div class="plate">PLATE 02 — FIGURE</div>
+    <div class="copy tight">
+      <div class="eyebrow reveal">02 — 图形 / FIGURE</div>
+      <h2 class="reveal d1">拖一下 D 点，<br>关系<span class="em">自己显形</span>。</h2>
+      <div class="latin reveal d1">Drag the point. See the relation.</div>
+      <p class="lede reveal d2">对象列表、实时测量和画布共用同一组数据。拖动 D 点，CD 的读数会立即变化；回到中点，就是答案 2.5。</p>
+      <div class="specs reveal d3">
+        <div class="cap"><span>VERIFIED / 界面实测</span><span>2D</span></div>
+        <div class="spec"><span>可拖对象</span><b>点 D ∈ AB</b></div>
+        <div class="spec"><span>实时测量</span><b>CD / 两点距离</b></div>
+        <div class="spec"><span>画布手势</span><b>拖点 / 滚轮 / 平移</b></div>
+        <div class="spec"><span>对象</span><b>10 个</b></div>
+        <div class="spec"><span>步骤</span><b>4 步</b></div>
+      </div>
+      <p class="note reveal d4">把 D 拖开，再看看步骤条怎么讲。</p>
+    </div>
+    <div class="scene-foot"><span><b>02 / FIGURE</b> — 拖动 D · 实时测量 · 10 个对象</span><span>02 / 08</span></div>
+  </section>
+
+  <section class="scene" id="s3" data-scene="3">
+    <div class="plate">PLATE 03 — SOLID</div>
+    <div class="copy right">
+      <div class="eyebrow reveal">03 — 立体 / SOLID</div>
+      <h2 class="reveal d1">换一道题，<br><span class="em">转过来</span>看。</h2>
+      <div class="latin reveal d1">Turn it over.</div>
+      <p class="lede reveal d2">同一套对象与步骤，换成可旋转的 3D 画布。拖动棱锥检查遮挡关系，滚轮缩放，复位视图回到初始角度。</p>
+      <div class="specs reveal d3">
+        <div class="cap"><span>VERIFIED / 界面实测</span><span>3D</span></div>
+        <div class="spec"><span>渲染引擎</span><b>three.js r127</b></div>
+        <div class="spec"><span>交互</span><b>拖动 / 滚轮</b></div>
+        <div class="spec"><span>对象命名</span><b>R-3D-13</b></div>
+        <div class="spec"><span>示例</span><b>三棱锥 P-ABC</b></div>
+        <div class="spec"><span>实时测量</span><b>sin θ = 0.577</b></div>
+      </div>
+      <p class="note reveal d4">直接在图形上拖动，换一个角度看。</p>
+    </div>
+    <div class="scene-foot"><span><b>03 / SOLID</b> — 拖动旋转 · 滚轮缩放 · 复位视图</span><span>03 / 08</span></div>
+  </section>
+
+  <section class="scene" id="s4" data-scene="4">
+    <div class="plate">PLATE 04 — SOLUTION</div>
+    <div class="copy tight">
+      <div class="eyebrow reveal">04 — 解答 / SOLUTION</div>
+      <h2 class="reveal d1">每一步，<br>都能<span class="em">指回图里</span>。</h2>
+      <div class="latin reveal d1">Every step points home.</div>
+      <p class="lede reveal d2">答案、解析与图形共用一组步骤。点步骤条，画布同步高亮；定位答案会把视角送到对应对象。</p>
+      <div class="specs reveal d3">
+        <div class="cap"><span>VERIFIED / 界面实测</span><span>SOLUTION</span></div>
+        <div class="spec"><span>公式</span><b>KaTeX</b></div>
+        <div class="spec"><span>答案</span><b>定位到图</b></div>
+        <div class="spec"><span>解析</span><b>逐步高亮</b></div>
+        <div class="spec"><span>小题</span><b>全部 / (1) / (2)</b></div>
+        <div class="spec"><span>微调</span><b>先预览，后保留</b></div>
+      </div>
+      <p class="note reveal d4">点应用里的 ◀ ▶，看步骤与图形同步。</p>
+    </div>
+    <div class="scene-foot"><span><b>04 / SOLUTION</b> — 步骤条 ↔ 解析卡 · 同组数据</span><span>04 / 08</span></div>
+  </section>
+
+  <section class="scene" id="s5" data-scene="5">
+    <div class="plate">PLATE 05 — REFINE</div>
+    <div class="copy tight">
+      <div class="eyebrow reveal">05 — 微调 / REFINE</div>
+      <h2 class="reveal d1">哪里不对，<br>说一句就<span class="em">改</span>。</h2>
+      <div class="latin reveal d1">Say it, it changes.</div>
+      <p class="lede reveal d2">图不像、解析太略、想换个画法——一句话微调。改完先预览：改动前后摆在一起看，点「保留」才写入记录；每次微调都存成一个版本，随时切回去。</p>
+      <div class="specs reveal d3">
+        <div class="cap"><span>VERIFIED / 界面实测</span><span>REFINE</span></div>
+        <div class="spec"><span>微调对象</span><b>图形 / 解析 / 图形类型</b></div>
+        <div class="spec"><span>确认方式</span><b>先预览差异，后保留</b></div>
+        <div class="spec"><span>后悔药</span><b>撤销，记录不受影响</b></div>
+        <div class="spec"><span>版本</span><b>每次微调一个快照</b></div>
+        <div class="spec"><span>多小问</span><b>逐问微调 / 逐问保留</b></div>
+      </div>
+      <p class="note reveal d4">点右边的版本标签，试试在三个版本之间切换。</p>
+    </div>
+    <div class="scene-foot"><span><b>05 / REFINE</b> — 一句话微调 · 先预览后保留 · 版本可切</span><span>05 / 08</span></div>
+  </section>
+
+  <section class="scene" id="s6" data-scene="6">
+    <div class="plate">PLATE 06 — ASK</div>
+    <div class="copy right">
+      <div class="eyebrow reveal">06 — 追问 / ASK</div>
+      <h2 class="reveal d1">没懂的，<br><span class="em">接着问</span>。</h2>
+      <div class="latin reveal d1">Keep asking.</div>
+      <p class="lede reveal d2">解完不是终点。围绕这道题继续追问，它带着完整上下文回答；追问与微调共用一条消息流，改图和提问可以混着来。</p>
+      <div class="specs reveal d3">
+        <div class="cap"><span>VERIFIED / 界面实测</span><span>ASK</span></div>
+        <div class="spec"><span>追问</span><b>多轮对话 / 上下文不丢</b></div>
+        <div class="spec"><span>形式</span><b>对话气泡，边问边改</b></div>
+        <div class="spec"><span>入口</span><b>解答面板常驻输入条</b></div>
+      </div>
+      <p class="note reveal d4">试试问它：第二步为什么要取中点？</p>
+    </div>
+    <div class="scene-foot"><span><b>06 / ASK</b> — 多轮追问 · 上下文不丢</span><span>06 / 08</span></div>
+  </section>
+
+  <section class="scene" id="s7" data-scene="7">
+    <div class="plate">PLATE 07 — EXPORT</div>
+    <div class="copy narrow">
+      <div class="eyebrow reveal">07 — 带走 / EXPORT</div>
+      <h2 class="reveal d1">关掉网络，<br>它<span class="em">还在</span>。</h2>
+      <div class="latin reveal d1">It travels offline.</div>
+      <p class="lede reveal d2">一张 2× PNG，或一份单文件 HTML。图形引擎、公式与字体全部内嵌，双击即开；再拖回何解，还能还原成记录。</p>
+      <div class="specs reveal d3">
+        <div class="cap"><span>VERIFIED / 界面实测</span><span>EXPORT</span></div>
+        <div class="spec"><span>PNG</span><b>2× 分辨率</b></div>
+        <div class="spec"><span>离线 HTML</span><b>1.5 — 2.5 MB</b></div>
+        <div class="spec"><span>字体</span><b>20 个，全部内嵌</b></div>
+        <div class="spec"><span>可回导</span><b>拖回即还原</b></div>
+        <div class="spec"><span>外部请求</span><b>0</b></div>
+      </div>
+      <p class="note reveal d4">右边那张纸，就是导出的全部内容。想要安装包？滚到最后一屏，或点右上角 DOWNLOAD。</p>
+    </div>
+    <div class="scene-foot"><span><b>07 / EXPORT</b> — PNG · 离线 HTML · 可回导</span><span>07 / 08</span></div>
+  </section>
+
+  <section class="scene finale" id="s8" data-scene="8">
+    <div class="plate">PLATE 08 — COLOPHON</div>
+    <div class="copy">
+      <div class="eyebrow reveal">08 — 末尾 / COLOPHON</div>
+      <h2 class="reveal d1">本地运行，<br><span class="em">开源</span>可查。</h2>
+      <div class="latin reveal d1">Runs locally. Open source.</div>
+      <p class="lede reveal d2">何解按 AGPL-3.0 开源：源码就是说明书，安装包由 GitHub Actions 从源码构建。本页的界面读数为示意——装上真的它，图形会回应你的每一次拖动。</p>
+      <div class="specs reveal d3">
+        <div class="cap"><span>COLOPHON</span><span>2026</span></div>
+        <div class="spec"><span>产品</span><b>何解 Hegy</b></div>
+        <div class="spec"><span>许可证</span><b>AGPL-3.0</b></div>
+        <div class="spec"><span>源码</span><b>github.com/kidnappe/hegy</b></div>
+        <div class="spec"><span>平台</span><b>Windows / Android</b></div>
+      </div>
+      <div class="dl reveal d4">
+        <div class="cap"><span>DOWNLOAD / 获取何解</span><span>v1.2.0</span></div>
+        <a class="dl-btn primary" href="https://github.com/kidnappe/hegy/releases/latest" target="_blank" rel="noopener">
+          <svg aria-hidden="true"><use href="#i-github"/></svg>
+          <span class="t"><b>GitHub Releases</b><i>Windows 桌面版 · 版本永远最新</i></span>
+          <em>直链 ↗</em>
+        </a>
+        <a class="dl-btn" id="dlMirror" href="#" aria-disabled="true">
+          <svg aria-hidden="true"><use href="#i-download"/></svg>
+          <span class="t"><b>蓝奏云镜像</b><i>国内直连更快 · 同步略有延迟</i></span>
+          <em>待上传</em>
+        </a>
+        <p class="dl-hint">蓝奏云提示「下载需要会员」时不是真要付费——是手机浏览器被导向了会员通道，在菜单里切到<b>电脑模式</b>再打开一次即可。</p>
+      </div>
+      <div class="pills reveal d4">
+        <a class="pill" href="#s0" style="text-decoration:none">回到开头 ↑</a>
+        <span class="pill accent">首发 v1.2.0</span>
+      </div>
+    </div>
+    <div class="hero-bottom">
+      <div class="hero-line">
+        <span>HEGY · OPEN SOURCE — AGPL-3.0</span>
+        <span>END OF PAGE / 感谢滚到这里</span>
+      </div>
+      <div class="giant">何解</div>
+    </div>
+  </section>
+</main>
+
+<div class="edge">HEGY · OPEN SOURCE · 2026</div>
+
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.7 5.1a3 3 0 0 0 1.9 1.9L21 12l-5.4 2a3 3 0 0 0-1.9 1.9L12 21l-1.7-5.1a3 3 0 0 0-1.9-1.9L3 12l5.4-2a3 3 0 0 0 1.9-1.9L12 3z"/><path d="M19 3v3M20.5 4.5h-3"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3.5 2"/></symbol>
+  <symbol id="i-file-down" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-panel-l" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M16 15l-3-3 3-3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M22 12h-4M6 12H2M12 6V2M12 22v-4"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="m6 3 15 9-15 9z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+</svg>
+
+<div id="stage">
+  <div id="app" class="app" data-state="input" data-step="2" aria-label="何解界面演示">
+    <header class="a-top">
+      <div class="a-logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVnSURBVFhH7VbbbxRVHMYHo9FnH3zAxMT4TyhUkEKv9M7uXHd71RbaNOHFYGkVShNoC0WguAXv+CKIUSGgUZBiFJTubndmd/YO3e6WblvbUihtAfOZc3ZmOjtb6T7ywC/5smfO5fu+8zu/ObNr1jyNJzlaW30v19ZGLXZ7uE3g/F0M4+3iCDili+PUtgFknLGkxm22YHttdYRvbAytNfNmFTYhuJdnQzM2IQ67OAa7MEZ/baSt/tqEBAUd1/oFrZ88JyBw4bsiH+xxOG48a9ZYMQA8w7PK2Rr7JDgmCMYip8FKsE2DBEuVRNvGceN8wlFjn4LAKj87HFjdhMDJ7WQBJVNFNFIqrotIKCsZpqBzVBN0jckEAeEUeanXrJcWzc3Blxird17buXG3ac8WGUUFbvR238Kh3hEU5rvTDJrFSR9rDYBjlIctLZFXzLp6iKLMkPNbicAoXlHmoRm4P/8ICwuPwFq1PrO4N7Ve3USqRnz1Zl09RF7uIMWjLTLvSuvLy3Xhh+8nkEwuYnb2Ic79OIm8zSQLXnVuSlhfrxog3KLg22/W1UPg5P1aBnTRNBIJxYXDaNsVgd9/D8f7RzHgSEBR7qG9LULHtCwZhZcNkLdCPmzW1cNu8x4kkzQSY/oItlVKKCkeRjg8jw87oujtGcHhvhjad0cRidynY2SOvsaUDcLNW+U+s64emgEtlUZxQpC/xY3PPxuDyzWH9W8MYcARxycnE7TtHJrDl1+MqUexnIEMA2xWBjJTSIqsxu5DMrmEHdsD2LTRpRvI3ehEU2MA4+NLdE55qSfDPDGStQHj4hQkWniDgzP47uwEtuS6UJTvxrGjMTiOx+lrSHZ+5vQEfr86g7zNLv1uWDaQZQZEPp6xuLjQjbb3w4jHF+kZV1VI1MDpb8Zx9tskNbCtQqb9o7EFdOw2FKQBKQO+xxuw8ekZIFft1iI3QqF59B2MoTB/mIrX1/qgRUO9gqKCYYqe7hGEQ/PYWjQMS5UMRq2DZQOrZMB4BKnCc2Hg4zi88j0U5LlpITbUKbjy2zSmph5QDF6Zxjv1CvI3u1CwxQ3JcxcnTyRom6Y/LQOrGTBkoLLcA46RaeG1NAewacMQNSNJd+ldcOSjGPqPjWLXe+GU6EAcuW87saMpgOT4EgTWi8ry5ePM4giUtAyQwjt/bpIWHjFy7c9ZXLz4D3jWi7fWO/W3IGedExzrxYULU7h+bRY8I+HM6SR+ujBFi5PyWchVvIqBGvuygdKtHrTs8GN0dAFfn7oNp3MO+zpv0iOorEjdiCcGEtQAaZMCJGOde27C5ZzDqa9u04JsbQlSrqwyUC0qvdoRkMr+6/odTEwsURFSVGTXRIwgZ90Qjh6J4Xh/HDlvDun9G3KcdO6nJxOYSC7hxt93KJdm4LFXMc/6OokBQtC5J0orPJFYpMdw+dI0rg7O0LuA4NKv04iE5xGN3MelX6ZT/Vdm6Bwy9/y5KSTii5SDZI5wkn9VIu87YNbVQ+C8NeSLVVUu0dR1tEexd89N9HTHKLoPjFCQdm9PDF37blFybSx9zgg9jg/ao2htCaCyzEMN2ATPu2ZdPRobpbWsxfeQswZo9ZYUe1RIKNXbWaBIhfpcUSaBtfrBWHz/1tX5XzXrpgXPeA5V2ybVCyTzi2iEdsH8H7RvALlZCafAyv1mvYxobg4+x1u9l8kC1uLPIKWoWqFPEzU9k50TLp5V/mhouPGCWW/F6LBdfl7klWMcE1yy8WMghUkqmEAkbRWkrUHr06D9jeeY0AORDw7s3Ol+0ayzajQ1hV6zi6E6gffvs4veQ9WCr88m+Pq038eCU7rqqqMN2+sir5t5n8YTFf8BtgeOJsmQIo0AAAAASUVORK5CYII=" alt=""></div>
+      <div class="a-brand">何解</div>
+      <div class="a-chip" data-act="cfg"><span class="dot"></span>deepseek-chat · 已配置</div>
+      <div class="a-sel" data-act="grade">年级 <b id="aGrade">初三</b><svg class="ai-sm"><use href="#i-chev"/></svg></div>
+      <div class="a-sel" data-act="dim">图形 <b id="aDim">自动</b><svg class="ai-sm"><use href="#i-chev"/></svg></div>
+      <div class="a-sel" data-act="view">画法 <b>真实尺寸</b><svg class="ai-sm"><use href="#i-chev"/></svg></div>
+      <span class="sp"></span>
+      <button class="a-tbtn" data-act="history"><svg class="ai"><use href="#i-history"/></svg>历史</button>
+      <button class="a-tbtn" data-act="export"><svg class="ai"><use href="#i-file-down"/></svg>导出</button>
+      <button class="a-tbtn ico" data-act="theme" title="切换夜间模式"><svg class="ai moon"><use href="#i-moon"/></svg><svg class="ai sun"><use href="#i-sun"/></svg></button>
+      <button class="a-tbtn" data-act="settings"><svg class="ai"><use href="#i-settings"/></svg>设置</button>
+    </header>
+
+    <div class="a-inputrow">
+      <div class="a-inputcol">
+        <div class="a-qbox">
+          <div class="a-qtext"><span class="q2d">如图，在 Rt△ABC 中，∠C = 90°，AC = 3，BC = 4，D 为 AB 的中点，求 CD 的长。</span><span class="q3d">如图，在三棱锥 P-ABC 中，PA ⊥ 底面 ABC，AC ⊥ BC，PA = √2，AC = BC = 2，M 为 PB 中点。求二面角 M-AC-B 的正弦值。</span><i class="a-caret"></i></div>
+        </div>
+        <div class="a-progwrap" id="aProgWrap">
+          <div class="a-progrow"><span id="aProgStage">模型输出中 · 已接收 1,204 字</span><span id="aProgPct">62%</span></div>
+          <div class="a-track"><i id="aProgFill" style="width:62%"></i></div>
+        </div>
+      </div>
+      <button class="a-solve" id="aSolve"><svg class="ai"><use href="#i-spark"/></svg>解题</button>
+    </div>
+
+    <div class="a-main">
+      <aside class="a-left">
+        <div class="a-ph"><span class="a-ph-t">对象</span><span class="a-ph-n" id="aObjCount">0</span><span class="sp"></span><button class="a-iconbtn" title="显示全部元素"><svg class="ai-sm"><use href="#i-eye"/></svg></button><button class="a-iconbtn" title="收起对象面板"><svg class="ai-sm"><use href="#i-panel-l"/></svg></button></div>
+        <div class="a-seg"><button class="on">全部</button><button>点</button><button>线</button><button>面</button></div>
+        <div class="a-objs" id="aObjs"><div class="a-empty">解题后，这里会列出图中的每个几何对象</div></div>
+        <div class="a-lf">
+          <div class="a-lbl">参数 · 点 D 在 AB 上</div>
+          <div class="a-sld-top"><span>位置</span><span class="a-sld-val" id="aParamVal">50%</span></div>
+          <input type="range" id="aRange" min="0" max="100" value="50" aria-label="点 D 在 AB 上的位置">
+        </div>
+      </aside>
+      <div class="a-split"></div>
+      <section class="a-canvas">
+        <div class="a-stageTop">
+          <div class="a-toolbar">
+            <button data-tool="reset" title="复位视图与点 D"><svg class="ai"><use href="#i-refresh"/></svg></button>
+            <button data-tool="focus" title="聚焦答案 CD"><svg class="ai"><use href="#i-cross"/></svg></button>
+            <button data-tool="grid" class="on" title="显示/隐藏网格"><svg class="ai"><use href="#i-grid"/></svg></button>
+            <button data-tool="png" title="导出 PNG 图片"><svg class="ai"><use href="#i-download"/></svg></button>
+            <span class="a-vsep"></span>
+            <button data-tool="full" title="全屏"><svg class="ai"><use href="#i-scan"/></svg></button>
+          </div>
+        </div>
+        <div class="a-measure"><span class="m-dot"></span>实时测量<b id="aMeasureCD">CD = 2.50</b></div>
+
+        <div class="a-welcome">
+          <div class="wico"><svg class="ai" style="width:26px;height:26px"><use href="#i-spark"/></svg></div>
+          <div class="wt">此题作何解？</div>
+          <div class="ws">文字、截图、多张图片都可以</div>
+          <div class="wbtns"><button class="p"><svg class="ai-sm" style="vertical-align:-2px"><use href="#i-image"/></svg> 粘贴题目截图</button><button class="g">直接输入文字</button></div>
+        </div>
+
+        <svg class="a-svg2d" id="svg2d" viewBox="0 0 626 644" aria-label="动态几何画布">
+          <g id="g2dGrid"></g>
+          <g class="a-fig" transform="translate(90 0)">
+            <circle id="midCircle" cx="307" cy="324" r="195" fill="none" stroke="#5b5bd6" stroke-width="1" stroke-dasharray="5 5" opacity="0"/>
+            <path class="tri-fill" id="triFill" d="M334 480 L100 168 L100 480 Z"/>
+            <path class="edge" id="edgeCA" d="M100 480 H334"/>
+            <path class="edge" id="edgeCB" d="M100 480 V168"/>
+            <path class="edge" id="edgeAB" d="M334 480 L100 168"/>
+            <path class="rightangle" d="M100 462 H118 V480"/>
+            <path id="lineCD" d="M100 480 L217 324"/>
+            <g id="ticks"></g>
+            <g class="cdtag" id="cdTag" transform="translate(166,392)"><rect x="0" y="-11" width="50" height="20" rx="4"/><text x="7" y="3" id="cdTagText">CD = 2.50</text></g>
+            <circle class="pt" cx="334" cy="480" r="5.4"/>
+            <circle class="pt" cx="100" cy="168" r="5.4"/>
+            <circle class="pt" cx="100" cy="480" r="5.4"/>
+            <circle class="pt d" id="dotD" cx="217" cy="324" r="5.8"/>
+            <circle id="hitD" cx="217" cy="324" r="18"/>
+            <g id="gLabels">
+              <text class="lbl" x="344" y="486">A</text>
+              <text class="lbl" x="84" y="160">B</text>
+              <text class="lbl" x="82" y="500">C</text>
+              <text class="lbl" x="231" y="318" id="lblD">D</text>
+            </g>
+          </g>
+        </svg>
+        <svg class="a-svg3d" id="svg3d" viewBox="0 0 626 644" aria-label="可旋转的三维图形"></svg>
+
+        <div class="a-stepdesc" id="aStepDesc"></div>
+        <div class="a-stepbar">
+          <div class="nav">
+            <button data-step-nav="-1" aria-label="上一步"><svg class="ai"><use href="#i-chev-l"/></svg></button>
+            <button data-step-nav="1" aria-label="下一步"><svg class="ai"><use href="#i-chev-r"/></svg></button>
+          </div>
+          <span class="idx" id="aStepIdx">2/4</span>
+          <span class="sttl" id="aStepTitle">取 AB 中点</span>
+          <button class="play" id="aPlay"><svg class="ai"><use href="#i-play"/></svg><span id="aPlayLabel">播放</span></button>
+          <button class="exp" id="aStepExp" aria-label="展开步骤说明"><svg class="ai-sm"><use href="#i-chev"/></svg></button>
+        </div>
+        <div class="a-qfloat"><svg class="ai-sm"><use href="#i-list"/></svg>原题文字 <span style="color:#98a0aa">+</span></div>
+      </section>
+      <div class="a-split"></div>
+      <aside class="a-right">
+        <div class="a-rhead"><span>解答</span><span class="sp"></span><button class="a-iconbtn" title="收起解答面板"><svg class="ai-sm"><use href="#i-panel-l"/></svg></button></div>
+        <div class="a-rbody">
+          <div class="a-onlyinput">
+            <div class="a-meta">还没有解题记录</div>
+            <div class="a-card"><div class="a-cardh">答案</div><div class="a-placeholder">—</div></div>
+            <div class="a-card"><div class="a-cardh">解析</div><div class="a-placeholder">—</div></div>
+          </div>
+          <div class="a-only2d">
+            <div class="a-meta">耗时 6.2s · token <b>1204</b> · 入 812 / 出 392 · 资费 —</div>
+            <div class="a-card hi">
+              <div class="a-cardh">答案<span class="sp"></span><button class="a-locate"><svg class="ai-sm"><use href="#i-target"/></svg>定位答案 CD</button></div>
+              <div class="a-answer">CD = <b>2.5</b></div>
+              <div class="a-ansub">D 为 AB 中点，CD 是斜边上的中线。</div>
+            </div>
+            <div class="a-card">
+              <div class="a-cardh">解析</div>
+              <div class="a-ab" data-ab="1"><span class="tag">01</span><span>由勾股定理：<em>AB = √(AC² + BC²) = 5</em></span></div>
+              <div class="a-ab" data-ab="2"><span class="tag">02</span><span>D 为 AB 中点：<em>AD = DB = 2.5</em></span></div>
+              <div class="a-ab key" data-ab="3"><span class="tag">03</span><span>斜边中线：<em>CD = ½ AB = 2.5</em></span></div>
+              <div class="a-ab" data-ab="4"><span class="tag">04</span><span>所以 CD 的长为 <em>2.5</em>。</span></div>
+            </div>
+            <div class="a-card">
+              <div class="a-cardh">实时提示</div>
+              <div class="a-ab"><span>拖动 D 点时，测量卡中的 CD 会立即更新。</span></div>
+            </div>
+          </div>
+          <div class="a-only3d">
+            <div class="a-meta">耗时 7.4s · token <b>1682</b> · 入 1104 / 出 578 · 资费 —</div>
+            <div class="a-card hi">
+              <div class="a-cardh">答案<span class="sp"></span><button class="a-locate"><svg class="ai-sm"><use href="#i-target"/></svg>定位答案 M</button></div>
+              <div class="a-answer">sin θ = <b>√3 / 3</b></div>
+              <div class="a-ansub">二面角 M-AC-B 的平面角，约 0.577。</div>
+            </div>
+            <div class="a-card">
+              <div class="a-cardh">解析</div>
+              <div class="a-ab" data-ab="1"><span class="tag">01</span><span>以 A 为原点建系：<em>A(0,0,0)、C(2,0,0)、B(2,2,0)、P(0,0,√2)</em>。</span></div>
+              <div class="a-ab" data-ab="2"><span class="tag">02</span><span>取 AC 中点 H(1,0,0)，连 <em>HM ⟂ AC</em>。</span></div>
+              <div class="a-ab key" data-ab="3"><span class="tag">03</span><span>HM 与 CB 方向的夹角，就是二面角的平面角 θ。</span></div>
+              <div class="a-ab" data-ab="4"><span class="tag">04</span><span><em>cos θ = √6/3</em>，所以 <em>sin θ = √3/3</em>。</span></div>
+            </div>
+            <div class="a-card">
+              <div class="a-cardh">视图</div>
+              <div class="a-ab"><span>拖动图形旋转，滚轮缩放；复位视图回到初始角度。</span></div>
+            </div>
+          </div>
+          <div class="a-onlyref">
+            <div class="a-meta">一句话微调 · 先预览后写入</div>
+            <div class="a-card">
+              <div class="a-cardh">微调预览</div>
+              <div class="a-refine-q">把 D 改成可以拖动的滑块，解析再详细些</div>
+              <div class="a-diff">
+                <div class="a-diff-row old"><span>原图形</span><b>D 为普通点</b></div>
+                <div class="a-diff-row new"><span>微调后</span><b>D 为可拖动滑块，解析补判定定理</b></div>
+              </div>
+              <div class="a-ref-actions">
+                <button class="keep" data-refact="keep">保留</button>
+                <button data-refact="drop">撤销</button>
+              </div>
+            </div>
+            <div class="a-card">
+              <div class="a-cardh">微调版本<span class="sp"></span><span style="font-weight:400;color:var(--p-txt3)">3 个快照</span></div>
+              <div class="a-vtabs">
+                <button class="on" data-ver="v3">v3 滑块版</button>
+                <button data-ver="v2">v2 加粗线版</button>
+                <button data-ver="v1">v1 原始版</button>
+              </div>
+              <div class="a-vnote">版本可来回切换；导出与分享用的是当前选中的版本。</div>
+            </div>
+          </div>
+          <div class="a-onlychat">
+            <div class="a-meta">接着这道题继续问 · 上下文不丢</div>
+            <div class="a-card">
+              <div class="a-cardh">对话</div>
+              <div class="a-msg me"><em>微调</em><span>把 D 点做成可以拖动的滑块</span></div>
+              <div class="a-msg bot"><span>已生成滑块：拖动 D，CD 读数实时更新。未确认前只预览，不写入记录。</span></div>
+              <div class="a-msg me"><em>追问</em><span>第二步为什么要取 AB 的中点？</span></div>
+              <div class="a-msg bot"><span>直角三角形斜边上的中线等于斜边的一半——取中点才能用上这条定理，所以 CD = ½ AB = 2.5。</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="a-refine">
+          <div class="a-ref-head"><svg class="ai-sm"><use href="#i-spark"/></svg>微调图形 / 解析<svg class="ai-sm chev"><use href="#i-chev"/></svg></div>
+          <div class="a-ref-row">
+            <span class="a-ref-sel">智能判断<svg class="ai-sm"><use href="#i-chev"/></svg></span>
+            <span class="a-ref-input">例如：解析再详细些；把动点改成可拖动的滑块</span>
+            <button class="a-ref-btn">微调</button>
+          </div>
+          <div class="a-ref-foot"><span>未确认的修改只预览，不会写入记录</span><span>0/200</span></div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="a-status"><span class="ok">就绪</span><span>已自动保存</span><span class="sp"></span><span id="aMode">2D · 自动</span></div>
+    <div class="a-toast" id="aToast"></div>
+  </div>
+  <aside id="printout" aria-hidden="true">
+    <div class="p-head"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVnSURBVFhH7VbbbxRVHMYHo9FnH3zAxMT4TyhUkEKv9M7uXHd71RbaNOHFYGkVShNoC0WguAXv+CKIUSGgUZBiFJTubndmd/YO3e6WblvbUihtAfOZc3ZmOjtb6T7ywC/5smfO5fu+8zu/ObNr1jyNJzlaW30v19ZGLXZ7uE3g/F0M4+3iCDili+PUtgFknLGkxm22YHttdYRvbAytNfNmFTYhuJdnQzM2IQ67OAa7MEZ/baSt/tqEBAUd1/oFrZ88JyBw4bsiH+xxOG48a9ZYMQA8w7PK2Rr7JDgmCMYip8FKsE2DBEuVRNvGceN8wlFjn4LAKj87HFjdhMDJ7WQBJVNFNFIqrotIKCsZpqBzVBN0jckEAeEUeanXrJcWzc3Blxird17buXG3ac8WGUUFbvR238Kh3hEU5rvTDJrFSR9rDYBjlIctLZFXzLp6iKLMkPNbicAoXlHmoRm4P/8ICwuPwFq1PrO4N7Ve3USqRnz1Zl09RF7uIMWjLTLvSuvLy3Xhh+8nkEwuYnb2Ic79OIm8zSQLXnVuSlhfrxog3KLg22/W1UPg5P1aBnTRNBIJxYXDaNsVgd9/D8f7RzHgSEBR7qG9LULHtCwZhZcNkLdCPmzW1cNu8x4kkzQSY/oItlVKKCkeRjg8jw87oujtGcHhvhjad0cRidynY2SOvsaUDcLNW+U+s64emgEtlUZxQpC/xY3PPxuDyzWH9W8MYcARxycnE7TtHJrDl1+MqUexnIEMA2xWBjJTSIqsxu5DMrmEHdsD2LTRpRvI3ehEU2MA4+NLdE55qSfDPDGStQHj4hQkWniDgzP47uwEtuS6UJTvxrGjMTiOx+lrSHZ+5vQEfr86g7zNLv1uWDaQZQZEPp6xuLjQjbb3w4jHF+kZV1VI1MDpb8Zx9tskNbCtQqb9o7EFdOw2FKQBKQO+xxuw8ekZIFft1iI3QqF59B2MoTB/mIrX1/qgRUO9gqKCYYqe7hGEQ/PYWjQMS5UMRq2DZQOrZMB4BKnCc2Hg4zi88j0U5LlpITbUKbjy2zSmph5QDF6Zxjv1CvI3u1CwxQ3JcxcnTyRom6Y/LQOrGTBkoLLcA46RaeG1NAewacMQNSNJd+ldcOSjGPqPjWLXe+GU6EAcuW87saMpgOT4EgTWi8ry5ePM4giUtAyQwjt/bpIWHjFy7c9ZXLz4D3jWi7fWO/W3IGedExzrxYULU7h+bRY8I+HM6SR+ujBFi5PyWchVvIqBGvuygdKtHrTs8GN0dAFfn7oNp3MO+zpv0iOorEjdiCcGEtQAaZMCJGOde27C5ZzDqa9u04JsbQlSrqwyUC0qvdoRkMr+6/odTEwsURFSVGTXRIwgZ90Qjh6J4Xh/HDlvDun9G3KcdO6nJxOYSC7hxt93KJdm4LFXMc/6OokBQtC5J0orPJFYpMdw+dI0rg7O0LuA4NKv04iE5xGN3MelX6ZT/Vdm6Bwy9/y5KSTii5SDZI5wkn9VIu87YNbVQ+C8NeSLVVUu0dR1tEexd89N9HTHKLoPjFCQdm9PDF37blFybSx9zgg9jg/ao2htCaCyzEMN2ATPu2ZdPRobpbWsxfeQswZo9ZYUe1RIKNXbWaBIhfpcUSaBtfrBWHz/1tX5XzXrpgXPeA5V2ybVCyTzi2iEdsH8H7RvALlZCafAyv1mvYxobg4+x1u9l8kC1uLPIKWoWqFPEzU9k50TLp5V/mhouPGCWW/F6LBdfl7klWMcE1yy8WMghUkqmEAkbRWkrUHr06D9jeeY0AORDw7s3Ol+0ayzajQ1hV6zi6E6gffvs4veQ9WCr88m+Pq038eCU7rqqqMN2+sir5t5n8YTFf8BtgeOJsmQIo0AAAAASUVORK5CYII=" alt=""><b>何解</b><span>离线导出</span><span class="tag">单文件 HTML</span></div>
+    <div class="p-q">如图，在 Rt△ABC 中，∠C = 90°，AC = 3，BC = 4，D 为 AB 的中点，求 CD 的长。</div>
+    <div class="p-fig">
+      <svg viewBox="0 0 300 210" aria-hidden="true">
+        <g fill="none" stroke="#eef0f3" stroke-width="1">
+          <path d="M30 20V190H285M30 190H285M30 140H285M30 90H285M30 40H285M80 20V190M130 20V190M180 20V190M230 20V190"/>
+        </g>
+        <g fill="none" stroke="#c9ced6" stroke-width="1"><path d="M30 190H285"/><path d="M30 20V190"/></g>
+        <path d="M70 170H245L70 30Z" fill="rgba(91,91,214,.06)" stroke="#1c2024" stroke-width="1.8"/>
+        <path d="M70 170L157.5 100" stroke="#5b5bd6" stroke-width="1.8"/>
+        <path d="M70 152H88V170" fill="none" stroke="#1c2024" stroke-width="1.2"/>
+        <g fill="#1c2024">
+          <circle cx="70" cy="170" r="3.2"/><circle cx="245" cy="170" r="3.2"/><circle cx="70" cy="30" r="3.2"/><circle cx="157.5" cy="100" r="3.2"/>
+        </g>
+        <g font-family="-apple-system,Segoe UI,Microsoft YaHei,sans-serif" font-size="9" fill="#1c2024">
+          <text x="252" y="173">A</text><text x="62" y="22">B</text><text x="60" y="182">C</text><text x="164" y="98">D</text>
+        </g>
+        <g font-family="Georgia,serif" font-size="9" font-style="italic" fill="#38358c"><text x="103" y="130">CD = 2.5</text></g>
+      </svg>
+    </div>
+    <div class="p-ans"><span>ANSWER</span><b>CD = 2.5</b></div>
+    <div class="p-note">D 为斜边中点，CD 是斜边上的中线，等于斜边的一半。</div>
+    <div class="p-steps">
+      <div class="p-step"><em>01</em><span>由勾股定理，AB = √(3² + 4²) = 5。</span></div>
+      <div class="p-step"><em>02</em><span>D 为 AB 中点，AD = DB = 2.5。</span></div>
+      <div class="p-step"><em>03</em><span>斜边中线 CD = ½ AB = 2.5。</span></div>
+    </div>
+    <div class="p-foot"><span>无外部请求 · 1.8 MB</span><span>可拖回何解还原</span></div>
+  </aside>
+  <div id="dAnno"><span class="dot-note"></span><span class="ring"></span><i class="leader"></i><span class="tag">FIG. 02 — 拖动 D</span></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => t * t * (3 - 2 * t);
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isMobile = () => window.innerWidth <= 900;
+
+const app = $('#app');
+const svg2d = $('#svg2d');
+const svg3d = $('#svg3d');
+const printout = $('#printout');
+const anno = $('#dAnno');
+const scenes = $$('.scene');
+const progressBar = $('#progress');
+
+const DESKTOP_KEYS = [
+  { w: .56, x: .70, y: .50, r: -4.0, ry: 5 },
+  { w: .58, x: .68, y: .50, r: 2.0, ry: 0 },
+  { w: .66, x: .66, y: .52, r: -1.5, ry: 0 },
+  { w: .68, x: .33, y: .50, r: 2.5, ry: -15 },
+  { w: .66, x: .66, y: .51, r: 0, ry: 0 },
+  { w: .62, x: .655, y: .52, r: -1.5, ry: 0 },
+  { w: .62, x: .345, y: .52, r: -2.0, ry: 8 },
+  { w: .42, x: .585, y: .58, r: -2.0, ry: 0 },
+  { w: .46, x: .70, y: .48, r: 3.0, ry: 8 }
+];
+const MOBILE_KEYS = [
+  { w: 1.52, x: .50, y: .74, r: -2.0, ry: 0 },
+  { w: 1.52, x: .50, y: .74, r: 1.6, ry: 0 },
+  { w: 1.52, x: .50, y: .74, r: -1.2, ry: 0 },
+  { w: 1.52, x: .50, y: .74, r: 1.8, ry: -8 },
+  { w: 1.52, x: .50, y: .74, r: -1.4, ry: 0 },
+  { w: 1.52, x: .50, y: .74, r: 1.2, ry: 0 },
+  { w: 1.52, x: .50, y: .74, r: -1.0, ry: 0 },
+  { w: 1.52, x: .50, y: .74, r: 1.8, ry: 0 },
+  { w: 1.52, x: .50, y: .74, r: -2.2, ry: 6 }
+];
+const STATE_BY_SCENE = ['input', 'input', '2d', '3d', '2d', 'refine', 'chat', '2d', '3d'];
+
+let vw = window.innerWidth;
+let vh = window.innerHeight;
+let docMax = 1;
+let travelAnchors = [];
+let activeAnchors = [];
+let activeScene = -1;
+let currentState = app.dataset.state;
+let tD = .5;
+let step = 2;
+let playing = false;
+let playTimer = null;
+let solving = false;
+let solveDone = false;
+let solveStart = 0;
+let cur = null;
+let last3 = 0;
+let yaw = -2.9;
+let pitch = .55;
+let dragging3 = false;
+let last3d = null;
+let draggingD = false;
+let gridOn = true;
+let flash3 = 0;
+let toastTimer = 0;
+let annoTick = 0;
+
+const STEPS2 = [
+  { t: '勾股定理', d: '先求斜边：<b>AB = √(AC² + BC²) = 5</b>。' },
+  { t: '取 AB 中点', d: 'D 是 AB 的中点，所以 <b>AD = DB = 2.5</b>。' },
+  { t: '斜边中线', d: '连接直角顶点 C 与中点 D。直角三角形斜边上的中线等于斜边的一半，<b>CD = ½ AB = 2.5</b>。' },
+  { t: '写出答案', d: '因此 <b>CD = 2.5</b>。点「定位答案」会把视角送回这条线段。' }
+];
+const STEPS3 = [
+  { t: '建系定坐标', d: '以 A 为原点：<b>A(0,0,0)、C(2,0,0)、B(2,2,0)、P(0,0,√2)</b>。' },
+  { t: '取 AC 中点', d: 'H(1,0,0)。连接 HM，则 <b>HM ⟂ AC</b>，M 为 PB 中点。' },
+  { t: '确定平面角', d: '底面内过 H 且垂直 AC 的方向与 CB 同向；HM 与该方向的夹角就是平面角 θ。' },
+  { t: '算出答案', d: '<b>cos θ = √6 / 3</b>，因此 <b>sin θ = √3 / 3 ≈ 0.577</b>。' }
+];
+
+function measure(){
+  vw = window.innerWidth;
+  vh = window.innerHeight;
+  travelAnchors = scenes.map((s, i) => i === 0 ? 0 : s.offsetTop);
+  activeAnchors = scenes.map((s, i) => i === 0 ? 0 : Math.max(0, s.offsetTop - vh * .28));
+  docMax = Math.max(1, document.documentElement.scrollHeight - vh);
+  cur = null;
+}
+
+function keySets(){ return isMobile() ? MOBILE_KEYS : DESKTOP_KEYS; }
+
+function stateFor(y){
+  let idx = 0;
+  for (let i = 0; i < activeAnchors.length; i++){
+    if (y >= activeAnchors[i]) idx = i;
+  }
+  return idx;
+}
+
+function targetFor(y){
+  const keys = keySets();
+  let i = 0;
+  for (let k = 0; k < travelAnchors.length; k++){
+    if (y >= travelAnchors[k] - 1) i = k;
+  }
+  const j = Math.min(i + 1, scenes.length - 1);
+  const a = travelAnchors[i];
+  const b = travelAnchors[j];
+  let raw = j === i ? 0 : clamp((y - a) / Math.max(1, b - a), 0, 1);
+  const t = smooth(clamp((raw - .16) / .84, 0, 1));
+  const A = keys[i];
+  const B = keys[j];
+  const wf = lerp(A.w, B.w, t);
+  const xf = lerp(A.x, B.x, t);
+  const yf = lerp(A.y, B.y, t);
+  const r = lerp(A.r, B.r, t);
+  const ry = lerp(A.ry || 0, B.ry || 0, t);
+  let wpx = wf * vw;
+  if (vw > 1900) wpx = Math.min(wpx, 1500);
+  wpx = Math.min(wpx, vh * (isMobile() ? .62 : .74) * (1240 / 800));
+  const scale = wpx / 1240;
+  return { cx: xf * vw, cy: yf * vh, scale, r, ry };
+}
+
+function applyTransform(v){
+  app.style.transform =
+    'translate3d(' + (v.cx - 620).toFixed(2) + 'px,' + (v.cy - 400).toFixed(2) + 'px,0) ' +
+    'scale(' + v.scale.toFixed(4) + ') rotate(' + v.r.toFixed(2) + 'deg) rotateY(' + v.ry.toFixed(2) + 'deg)';
+}
+
+function toast(msg){
+  const el = $('#aToast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+function buildGrid(){
+  const host = $('#g2dGrid');
+  if (!host) return;
+  const ox = 190, oy = 480, u = 78;
+  let s = '';
+  for (let k = -1; k <= 5; k++){
+    const x = ox + k * u;
+    s += '<line class="gl" x1="' + x + '" y1="26" x2="' + x + '" y2="622"/>';
+  }
+  for (let k = -1; k <= 6; k++){
+    const y = oy - k * u;
+    if (y > 26 && y < 622) s += '<line class="gl" x1="26" y1="' + y + '" x2="606" y2="' + y + '"/>';
+  }
+  s += '<path class="ax" d="M26 480H600"/>';
+  s += '<path class="ax" d="M190 622V28"/>';
+  s += '<path class="ax" d="M592 476l9 4-9 4"/>';
+  s += '<path class="ax" d="M186 36l4-9 4 9"/>';
+  for (let k = -1; k <= 5; k++){
+    if (k === 0) continue;
+    const x = ox + k * u;
+    s += '<line class="tk" x1="' + x + '" y1="475" x2="' + x + '" y2="485"/>';
+    s += '<text x="' + x + '" y="498" text-anchor="middle">' + k + '</text>';
+  }
+  for (let k = -1; k <= 5; k++){
+    if (k === 0) continue;
+    const y = oy - k * u;
+    if (y < 30 || y > 615) continue;
+    s += '<line class="tk" x1="185" y1="' + y + '" x2="195" y2="' + y + '"/>';
+    s += '<text x="181" y="' + (y + 3.5) + '" text-anchor="end">' + k + '</text>';
+  }
+  host.innerHTML = s;
+}
+
+const OBJ2D = [
+  { n: 'A', v: '(3.00, 0.00)', c: '#1c2024' },
+  { n: 'B', v: '(0.00, 4.00)', c: '#1c2024' },
+  { n: 'C', v: '(0.00, 0.00)', c: '#1c2024' },
+  { n: 'D', v: '(1.50, 2.00)', c: '#5b5bd6' },
+  { n: 'AB', v: '5.00', c: '#49505b', sq: true },
+  { n: 'BC', v: '4.00', c: '#49505b', sq: true },
+  { n: 'CA', v: '3.00', c: '#49505b', sq: true },
+  { n: 'CD', v: '2.50', c: '#5b5bd6', sq: true },
+  { n: '∠C', v: '90.0°', c: '#e8590c' },
+  { n: '△ABC', v: '6.00', c: '#12a150' }
+];
+const OBJ3D = [
+  { n: 'P', v: '点', c: '#8b1e1e' },
+  { n: 'A', v: '点', c: '#8b1e1e' },
+  { n: 'B', v: '点', c: '#8b1e1e' },
+  { n: 'C', v: '点', c: '#8b1e1e' },
+  { n: 'M', v: 'PB 中点', c: '#5b5bd6' },
+  { n: 'PA', v: '√2', c: '#49505b', sq: true },
+  { n: 'PB', v: '√10', c: '#49505b', sq: true },
+  { n: 'PC', v: '√6', c: '#49505b', sq: true },
+  { n: 'AC', v: '2.00', c: '#49505b', sq: true },
+  { n: 'BC', v: '2.00', c: '#49505b', sq: true },
+  { n: 'H', v: 'AC 中点', c: '#7b1fa2' }
+];
+
+function rowHTML(o){
+  return '<div class="a-obj" data-obj="' + o.n + '">' +
+    '<span class="cdot' + (o.sq ? ' sq' : '') + '" style="background:' + o.c + '"></span>' +
+    '<span class="nm">' + o.n + '</span>' +
+    '<span class="df">' + o.v + '</span>' +
+    '<button class="act" data-objact="eye" aria-label="显示或隐藏"><svg class="ai-sm"><use href="#i-eye"/></svg></button>' +
+    '<button class="act" data-objact="lock" aria-label="定位"><svg class="ai-sm"><use href="#i-target"/></svg></button>' +
+    '</div>';
+}
+
+function renderObjs(){
+  const host = $('#aObjs');
+  if (!host) return;
+  if (currentState === 'input'){
+    $('#aObjCount').textContent = '0';
+    host.innerHTML = '<div class="a-empty">解题后，这里会列出图中的每个几何对象</div>';
+    return;
+  }
+  const list = currentState === '3d' ? OBJ3D : OBJ2D;
+  $('#aObjCount').textContent = String(list.length);
+  host.innerHTML = list.map(rowHTML).join('');
+  if (currentState === '2d'){
+    const d = $('[data-obj="D"]', host);
+    if (d) d.classList.add('on');
+    updateD();
+  }
+}
+
+function setObjVal(name, value){
+  const el = $('[data-obj="' + name + '"] .df', $('#aObjs'));
+  if (el) el.textContent = value;
+}
+
+function updateD(){
+  const A = { x: 334, y: 480 };
+  const B = { x: 100, y: 168 };
+  const px = A.x + (B.x - A.x) * tD;
+  const py = A.y + (B.y - A.y) * tD;
+  const mx = 3 * (1 - tD);
+  const my = 4 * tD;
+  const cd = Math.hypot(mx, my);
+  const mid = Math.abs(tD - .5) < .006;
+  const line = $('#lineCD');
+  const dot = $('#dotD');
+  const hit = $('#hitD');
+  const lbl = $('#lblD');
+  if (line) line.setAttribute('d', 'M100 480 L' + px.toFixed(1) + ' ' + py.toFixed(1));
+  if (dot){ dot.setAttribute('cx', px.toFixed(1)); dot.setAttribute('cy', py.toFixed(1)); }
+  if (hit){ hit.setAttribute('cx', px.toFixed(1)); hit.setAttribute('cy', py.toFixed(1)); }
+  if (lbl){ lbl.setAttribute('x', (px + 14).toFixed(1)); lbl.setAttribute('y', (py - 8).toFixed(1)); }
+  const circle = $('#midCircle');
+  if (circle){
+    circle.setAttribute('cx', px.toFixed(1));
+    circle.setAttribute('cy', py.toFixed(1));
+    circle.setAttribute('r', (cd * 78).toFixed(1));
+    circle.style.opacity = (mid && step === 3) ? '.26' : '0';
+  }
+  const tag = $('#cdTag');
+  if (tag){
+    const tx = (100 + px) / 2 + 10;
+    const ty = (480 + py) / 2 - 18;
+    tag.setAttribute('transform', 'translate(' + tx.toFixed(1) + ',' + ty.toFixed(1) + ')');
+  }
+  const tagText = $('#cdTagText');
+  if (tagText) tagText.textContent = 'CD = ' + cd.toFixed(2);
+  const measure = $('#aMeasureCD');
+  if (measure && currentState === '2d') measure.textContent = 'CD = ' + cd.toFixed(2) + (mid ? '' : ' · 拖动中');
+  const pv = $('#aParamVal');
+  if (pv) pv.textContent = Math.round(tD * 100) + '%';
+  const range = $('#aRange');
+  if (range){
+    const v = String(Math.round(tD * 100));
+    if (range.value !== v) range.value = v;
+  }
+  setObjVal('D', '(' + mx.toFixed(2) + ', ' + my.toFixed(2) + ')');
+  setObjVal('CD', cd.toFixed(2));
+  const ticks = $('#ticks');
+  if (ticks){
+    if (mid){
+      ticks.style.display = '';
+      const adx = (A.x + px) / 2, ady = (A.y + py) / 2;
+      const dbx = (px + B.x) / 2, dby = (py + B.y) / 2;
+      const dx = B.x - A.x, dy = B.y - A.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len * 6, ny = dx / len * 6;
+      ticks.innerHTML =
+        '<line class="tick" x1="' + (adx - nx).toFixed(1) + '" y1="' + (ady - ny).toFixed(1) + '" x2="' + (adx + nx).toFixed(1) + '" y2="' + (ady + ny).toFixed(1) + '"/>' +
+        '<line class="tick" x1="' + (dbx - nx).toFixed(1) + '" y1="' + (dby - ny).toFixed(1) + '" x2="' + (dbx + nx).toFixed(1) + '" y2="' + (dby + ny).toFixed(1) + '"/>';
+    } else {
+      ticks.style.display = 'none';
+    }
+  }
+}
+
+function setD(v, announce){
+  tD = clamp(v, 0, 1);
+  updateD();
+  if (announce) toast('已回到中点 · CD = 2.50');
+}
+
+function flashCD(){
+  const line = $('#lineCD');
+  if (!line || !line.animate) return;
+  line.animate(
+    [{ opacity: .2 }, { opacity: 1 }, { opacity: .25 }, { opacity: 1 }],
+    { duration: 760, easing: 'ease-out' }
+  );
+}
+
+function steps(){
+  return currentState === '3d' ? STEPS3 : STEPS2;
+}
+
+function setPlayLabel(){
+  const el = $('#aPlayLabel');
+  if (el) el.textContent = playing ? '停止' : '播放';
+}
+
+function stopPlay(){
+  playing = false;
+  if (playTimer) clearInterval(playTimer);
+  playTimer = null;
+  setPlayLabel();
+}
+
+function setStep(n, opts){
+  const list = steps();
+  step = clamp(n, 1, list.length);
+  app.dataset.step = String(step);
+  const idx = $('#aStepIdx');
+  if (idx) idx.textContent = step + '/' + list.length;
+  const ttl = $('#aStepTitle');
+  if (ttl) ttl.textContent = list[step - 1].t;
+  const desc = $('#aStepDesc');
+  if (desc) desc.innerHTML = '<b>步骤 ' + step + ' / ' + list.length + ' · ' + list[step - 1].t + '</b><br>' + list[step - 1].d;
+  const group = currentState === '3d' ? $('.a-only3d') : $('.a-only2d');
+  if (group){
+    $$('.a-ab[data-ab]', group).forEach(el => el.classList.remove('active'));
+    const active = $('.a-ab[data-ab="' + step + '"]', group);
+    if (active) active.classList.add('active');
+  }
+  if (currentState === '2d' && step === 3) setD(.5, false);
+  const circle = $('#midCircle');
+  if (circle) circle.style.opacity = (currentState === '2d' && step === 3 && Math.abs(tD - .5) < .006) ? '.26' : '0';
+}
+
+function setState(s){
+  if (s === currentState){
+    if (s === '2d') updateD();
+    return;
+  }
+  stopPlay();
+  if (solving){
+    solving = false;
+    app.classList.remove('solving');
+  }
+  if (currentState === '3d') dragging3 = false;
+  currentState = s;
+  app.dataset.state = s;
+  if (s === 'input'){
+    renderObjs();
+    $('#aStepDesc')?.classList.remove('show');
+    const measure = $('#aMeasureCD');
+    if (measure) measure.textContent = 'CD = 2.50';
+  } else if (s === '2d'){
+    renderObjs();
+    $('#aStepDesc')?.classList.remove('show');
+    updateD();
+  } else if (s === 'chat'){
+    renderObjs();
+    $('#aStepDesc')?.classList.remove('show');
+    updateD();
+  } else if (s === 'refine'){
+    renderObjs();
+    $('#aStepDesc')?.classList.remove('show');
+    updateD();
+  } else {
+    renderObjs();
+    const measure = $('#aMeasureCD');
+    if (measure) measure.textContent = 'sin θ = 0.577';
+    render3d(performance.now());
+  }
+  const dim = $('#aDim');
+  if (dim) dim.textContent = s === '3d' ? '立体 3D' : '自动';
+  const grade = $('#aGrade');
+  if (grade) grade.textContent = s === '3d' ? '高二' : '初三';
+  const mode = $('#aMode');
+  if (mode) mode.textContent = s === '3d' ? '3D · 手动' : (s === 'chat' ? '2D · 对话' : (s === 'refine' ? '2D · 微调' : '2D · 自动'));
+}
+
+function startSolve(){
+  if (solving) return;
+  solveDone = false;
+  solving = true;
+  solveStart = performance.now();
+  app.classList.add('solving');
+  const stage = $('#aProgStage');
+  if (stage) stage.textContent = '正在调用模型';
+  const pct = $('#aProgPct');
+  if (pct) pct.textContent = '3%';
+  const fill = $('#aProgFill');
+  if (fill) fill.style.width = '3%';
+}
+
+function updateSolve(now){
+  if (!solving) return;
+  const p = clamp((now - solveStart) / 4600, 0, 1);
+  const eased = 1 - Math.pow(1 - p, 3);
+  const pct = Math.round(eased * 100);
+  let stage;
+  if (pct < 10) stage = '正在调用模型';
+  else if (pct < 58) stage = '模型输出中 · 已接收 ' + Math.round(pct * 24) + ' 字';
+  else if (pct < 80) stage = '解析结果';
+  else if (pct < 95) stage = '校验图形';
+  else stage = '完成 · 已生成 2D 图形';
+  const stageEl = $('#aProgStage');
+  if (stageEl) stageEl.textContent = stage;
+  const pctEl = $('#aProgPct');
+  if (pctEl) pctEl.textContent = pct + '%';
+  const fill = $('#aProgFill');
+  if (fill) fill.style.width = pct + '%';
+  if (p >= 1){
+    solving = false;
+    solveDone = true;
+    app.classList.remove('solving');
+    toast('演示完成 · 向下滚动查看图形');
+  }
+}
+
+function onSceneChange(i){
+  activeScene = i;
+  const want = STATE_BY_SCENE[i];
+  setState(want);
+  if (want === '2d'){
+    setStep(i === 2 ? 2 : (i === 7 ? 4 : 3));
+    if (i !== 2) setD(.5, false);
+    else setD(.5, false);
+  }
+  if (want === '3d'){
+    setStep(i === 8 ? 3 : 2);
+  }
+  if (i === 1 && !solveDone) startSolve();
+  printout.classList.toggle('show', i === 7);
+  $$('.navlinks a').forEach(a => a.classList.toggle('on', Number(a.dataset.nav) === i));
+}
+
+function updateAnno(){
+  if (activeScene !== 2 || currentState !== '2d' || isMobile()){
+    anno.classList.remove('show');
+    return;
+  }
+  const hit = $('#hitD');
+  if (!hit) return;
+  const r = hit.getBoundingClientRect();
+  const x = r.left + r.width / 2;
+  const y = r.top + r.height / 2;
+  if (x < 0 || x > vw || y < 0 || y > vh){
+    anno.classList.remove('show');
+    return;
+  }
+  anno.style.left = x.toFixed(1) + 'px';
+  anno.style.top = y.toFixed(1) + 'px';
+  anno.classList.add('show');
+}
+
+const V3 = {
+  A: [0, 0, 0],
+  B: [2, 2, 0],
+  C: [2, 0, 0],
+  P: [0, 0, Math.SQRT2],
+  M: [1, 1, Math.SQRT2 / 2],
+  H: [1, 0, 0],
+  Q: [1, 2, 0]
+};
+
+function project3(p, yawA, pitchA){
+  const x = p[0] - 1;
+  const y = p[1] - .8;
+  const z = p[2] - .55;
+  const cy = Math.cos(yawA);
+  const sy = Math.sin(yawA);
+  const X = x * cy - y * sy;
+  const D = x * sy + y * cy;
+  const cp = Math.cos(pitchA);
+  const sp = Math.sin(pitchA);
+  const Y = z * cp - D * sp;
+  const roll = -.10;
+  const RX = X * Math.cos(roll) - Y * Math.sin(roll);
+  const RY = X * Math.sin(roll) + Y * Math.cos(roll);
+  return { x: 350 + RX * 175, y: 325 - RY * 175, d: D };
+}
+
+function render3d(now){
+  if (currentState !== '3d') return;
+  if (!dragging3 && !reduce) yaw += .0028;
+  const ids = ['A', 'B', 'C', 'P', 'M', 'H', 'Q'];
+  const pts = {};
+  ids.forEach(k => { pts[k] = project3(V3[k], yaw, pitch); });
+  const faces = [
+    { ids: ['A', 'B', 'C'], fill: 'rgba(83,160,96,.115)', stroke: 'rgba(82,128,88,.35)' },
+    { ids: ['P', 'A', 'B'], fill: 'rgba(83,160,96,.045)', stroke: 'rgba(82,128,88,.22)' },
+    { ids: ['P', 'B', 'C'], fill: 'rgba(83,160,96,.10)', stroke: 'rgba(82,128,88,.28)' },
+    { ids: ['P', 'C', 'A'], fill: 'rgba(83,160,96,.045)', stroke: 'rgba(82,128,88,.22)' }
+  ];
+  faces.forEach(f => { f.depth = f.ids.reduce((sum, id) => sum + pts[id].d, 0) / f.ids.length; });
+  faces.sort((a, b) => a.depth - b.depth);
+  const line = (a, b, color, width, dash, opacity) => {
+    const p = pts[a], q = pts[b];
+    return '<line x1="' + p.x.toFixed(1) + '" y1="' + p.y.toFixed(1) + '" x2="' + q.x.toFixed(1) + '" y2="' + q.y.toFixed(1) + '" stroke="' + color + '" stroke-width="' + width + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + (opacity ? ' opacity="' + opacity + '"' : '') + ' stroke-linecap="round"/>';
+  };
+  let out = '';
+  faces.forEach(f => {
+    const d = f.ids.map((id, idx) => {
+      const p = pts[id];
+      return (idx === 0 ? 'M' : 'L') + p.x.toFixed(1) + ' ' + p.y.toFixed(1);
+    }).join(' ') + ' Z';
+    out += '<path d="' + d + '" fill="' + f.fill + '" stroke="' + f.stroke + '" stroke-width=".7"/>';
+  });
+  if (step >= 2){
+    const mac = pts.M, a = pts.A, c = pts.C;
+    out += '<path d="M' + mac.x.toFixed(1) + ' ' + mac.y.toFixed(1) + 'L' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + 'L' + c.x.toFixed(1) + ' ' + c.y.toFixed(1) + 'Z" fill="rgba(240,140,0,.075)" stroke="rgba(176,122,34,.45)" stroke-width=".8"/>';
+  }
+  out += line('P', 'A', '#1c2024', 1.55);
+  out += line('P', 'B', '#1c2024', 1.55);
+  out += line('P', 'C', '#1c2024', 1.55);
+  out += line('A', 'C', '#1c2024', 1.75);
+  out += line('B', 'C', '#1c2024', 1.55);
+  out += line('A', 'B', '#4f5662', 1.2, '4 4', .52);
+  out += line('C', 'M', '#b04a5a', 1.7);
+  out += line('A', 'M', '#b04a5a', 1.2, '4 4', .8);
+  if (step >= 2){
+    out += line('H', 'M', '#7b1fa2', 1.5, '4 4');
+  }
+  if (step >= 3){
+    out += line('H', 'Q', '#90a4ae', 1.2, '3 4', .9);
+    const h = pts.H, m = pts.M, q = pts.Q;
+    const a1 = Math.atan2(m.y - h.y, m.x - h.x);
+    const a2 = Math.atan2(q.y - h.y, q.x - h.x);
+    let diff = a2 - a1;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    const r = 24;
+    const sx = h.x + Math.cos(a1) * r, sy = h.y + Math.sin(a1) * r;
+    const ex = h.x + Math.cos(a2) * r, ey = h.y + Math.sin(a2) * r;
+    out += '<path d="M' + sx.toFixed(1) + ' ' + sy.toFixed(1) + 'A' + r + ' ' + r + ' 0 0 ' + (diff > 0 ? 1 : 0) + ' ' + ex.toFixed(1) + ' ' + ey.toFixed(1) + '" fill="none" stroke="#b07a22" stroke-width="1.2"/>';
+    const midA = a1 + diff / 2;
+    out += '<text x="' + (h.x + Math.cos(midA) * (r + 11)).toFixed(1) + '" y="' + (h.y + Math.sin(midA) * (r + 11) + 3).toFixed(1) + '" font-size="10" font-style="italic" fill="#b07a22" font-family="Georgia,serif">θ</text>';
+  }
+  const pointOffsets = { P: [-5, -12], A: [-15, 12], B: [10, 6], C: [-16, 10], M: [10, -8], H: [-14, 14] };
+  ['A', 'B', 'C', 'P', 'M'].forEach(k => {
+    const p = pts[k];
+    const accent = k === 'M';
+    out += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + (accent ? 4.4 : 3.6) + '" fill="' + (accent ? '#5b5bd6' : '#8b1e1e') + '" stroke="#fff" stroke-width="1"/>';
+    if (accent && performance.now() < flash3){
+      out += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="10" fill="none" stroke="#5b5bd6" stroke-width="1" opacity=".6"/>';
+    }
+  });
+  if (step >= 2){
+    const p = pts.H;
+    out += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3.6" fill="#7b1fa2" stroke="#fff" stroke-width="1"/>';
+    const q = pts.Q;
+    if (step >= 3) out += '<text x="' + (q.x + 6).toFixed(1) + '" y="' + (q.y + 4).toFixed(1) + '" font-size="9" fill="#7b8794" font-family="-apple-system,Segoe UI,Microsoft YaHei,sans-serif">∥ CB</text>';
+  }
+  const labels = step >= 2 ? ['A', 'B', 'C', 'P', 'M', 'H'] : ['A', 'B', 'C', 'P', 'M'];
+  labels.forEach(k => {
+    const p = pts[k];
+    const o = pointOffsets[k] || [8, 0];
+    const color = k === 'M' ? '#5b5bd6' : (k === 'H' ? '#7b1fa2' : '#1c2024');
+    out += '<text x="' + (p.x + o[0]).toFixed(1) + '" y="' + (p.y + o[1]).toFixed(1) + '" font-size="12" font-weight="600" fill="' + color + '" font-family="-apple-system,Segoe UI,Microsoft YaHei,sans-serif" paint-order="stroke" stroke="#fff" stroke-width="3" stroke-linejoin="round">' + k + '</text>';
+  });
+  svg3d.innerHTML = out;
+}
+
+function scrollToScene(i){
+  const top = i === 0 ? 0 : scenes[i].offsetTop;
+  /* 平滑/减动效由 html 的 scroll-behavior 控制（含 prefers-reduced-motion 兜底） */
+  window.scrollTo(0, top);
+}
+
+function frame(now){
+  const y = window.scrollY;
+  progressBar.style.transform = 'scaleX(' + clamp(y / docMax, 0, 1).toFixed(4) + ')';
+  updateSolve(now);
+  const target = targetFor(y);
+  if (!cur) cur = Object.assign({}, target);
+  const f = reduce ? 1 : .13;
+  cur.cx = lerp(cur.cx, target.cx, f);
+  cur.cy = lerp(cur.cy, target.cy, f);
+  cur.scale = lerp(cur.scale, target.scale, f);
+  cur.r = lerp(cur.r, target.r, f);
+  cur.ry = lerp(cur.ry, target.ry, f);
+  const float = reduce ? 0 : Math.sin(now * .00055) * 3.2;
+  const drift = reduce ? 0 : Math.sin(now * .00042) * .35;
+  applyTransform({ cx: cur.cx, cy: cur.cy + float, scale: cur.scale, r: cur.r + drift, ry: cur.ry });
+  const active = stateFor(y);
+  if (active !== activeScene) onSceneChange(active);
+  if (activeScene === 2){
+    annoTick++;
+    if (annoTick % 2 === 0) updateAnno();
+  } else if (anno.classList.contains('show')){
+    anno.classList.remove('show');
+  }
+  if (currentState === '3d' && now - last3 > 32){
+    render3d(now);
+    last3 = now;
+  }
+  requestAnimationFrame(frame);
+}
+
+/* interactions */
+buildGrid();
+renderObjs();
+
+$('#aSolve').addEventListener('click', () => {
+  if (currentState !== 'input'){
+    toast('这道题已经解出 · 直接在图形上拖动 D');
+    return;
+  }
+  startSolve();
+});
+$('#aRange').addEventListener('input', e => {
+  stopPlay();
+  tD = clamp(Number(e.target.value) / 100, 0, 1);
+  updateD();
+});
+
+const hitD = $('#hitD');
+hitD.addEventListener('pointerdown', e => {
+  if (currentState !== '2d') return;
+  e.preventDefault();
+  draggingD = true;
+  hitD.setPointerCapture(e.pointerId);
+});
+hitD.addEventListener('pointermove', e => {
+  if (!draggingD) return;
+  e.preventDefault();
+  const pt = svg2d.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  const ctm = hitD.getScreenCTM();
+  if (!ctm) return;
+  const loc = pt.matrixTransform(ctm.inverse());
+  const ax = 334, ay = 480, bx = 100, by = 168;
+  const dx = bx - ax, dy = by - ay;
+  const next = ((loc.x - ax) * dx + (loc.y - ay) * dy) / (dx * dx + dy * dy);
+  tD = clamp(next, 0, 1);
+  updateD();
+});
+const endDrag = e => {
+  if (!draggingD) return;
+  draggingD = false;
+  try { hitD.releasePointerCapture(e.pointerId); } catch (err) {}
+};
+hitD.addEventListener('pointerup', endDrag);
+hitD.addEventListener('pointercancel', endDrag);
+
+$('#aObjs').addEventListener('click', e => {
+  const act = e.target.closest('[data-objact]');
+  if (act){
+    toast('演示：显隐与定位控件未接入');
+    return;
+  }
+  const row = e.target.closest('.a-obj');
+  if (!row) return;
+  $$('.a-obj', $('#aObjs')).forEach(x => x.classList.remove('on'));
+  row.classList.add('on');
+  if (currentState === '2d' && row.dataset.obj === 'D') toast('已选中点 D · 可直接在画布上拖动');
+});
+
+$('.a-toolbar').addEventListener('click', e => {
+  const btn = e.target.closest('[data-tool]');
+  if (!btn) return;
+  const tool = btn.dataset.tool;
+  if (tool === 'grid'){
+    if (currentState === '3d'){ toast('网格只在 2D 画布中可用'); return; }
+    gridOn = !gridOn;
+    $('#g2dGrid').style.opacity = gridOn ? '1' : '0';
+    btn.classList.toggle('on', gridOn);
+    return;
+  }
+  if (tool === 'reset'){
+    yaw = -2.9;
+    pitch = .55;
+    setD(.5, false);
+    flashCD();
+    toast(currentState === '3d' ? '视图已复位' : '已回到中点 · CD = 2.50');
+    return;
+  }
+  if (tool === 'focus'){
+    if (currentState === '3d'){
+      flash3 = performance.now() + 1800;
+      toast('已定位答案 M');
+    } else {
+      setStep(3);
+      flashCD();
+      toast('已定位答案 CD');
+    }
+    return;
+  }
+  if (tool === 'png'){ toast('导出 PNG 未接入这次演示'); return; }
+  if (tool === 'full'){ toast('全屏未接入这次演示'); }
+});
+
+$$('[data-step-nav]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    stopPlay();
+    setStep(step + Number(btn.dataset.stepNav));
+  });
+});
+$('#aPlay').addEventListener('click', () => {
+  if (playing){ stopPlay(); return; }
+  stopPlay();
+  playing = true;
+  setPlayLabel();
+  setStep(1);
+  playTimer = setInterval(() => {
+    if (step >= steps().length){ stopPlay(); return; }
+    setStep(step + 1);
+  }, 1650);
+});
+$('#aStepExp').addEventListener('click', () => {
+  $('#aStepDesc').classList.toggle('show');
+});
+$$('.a-locate').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (currentState === '3d'){
+      flash3 = performance.now() + 1800;
+      toast('已定位答案 M');
+    } else {
+      setStep(3);
+      flashCD();
+      toast('已定位答案 CD');
+    }
+  });
+});
+$('.a-ref-btn').addEventListener('click', () => toast('微调未接入这次演示'));
+$$('.a-welcome .wbtns button').forEach(btn => {
+  btn.addEventListener('click', () => toast('演示已预填题干 · 点「解题」重放进度'));
+});
+$('.a-qfloat').addEventListener('click', () => {
+  toast('原题：Rt△ABC，∠C = 90°，AC = 3，BC = 4，D 为 AB 中点');
+});
+printout.addEventListener('click', () => toast('这是导出页的缩略预览'));
+
+/* 微调面板：版本切换与保留 / 撤销 */
+$$('.a-vtabs button').forEach(btn => btn.addEventListener('click', () => {
+  $$('.a-vtabs button').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  toast('已切到 ' + btn.dataset.ver + ' · 图形与解析一起切换');
+}));
+$$('.a-ref-actions button').forEach(btn => btn.addEventListener('click', () => {
+  toast(btn.dataset.refact === 'keep' ? '已保留 · 存为版本 v3' : '已撤销 · 记录仍是 v2');
+}));
+
+/* 蓝奏云镜像：拿到分享链接后填进 MIRROR_URL，第五节的镜像按钮会自动启用（提取码可空） */
+const MIRROR_URL = "";   // 例："https://zhouxuan.lanzoue.com/b0xxxxxxx"
+const MIRROR_CODE = "";  // 例："9c6p"
+const mirror = $('#dlMirror');
+if (mirror){
+  mirror.addEventListener('click', e => {
+    if (!MIRROR_URL){ e.preventDefault(); toast('蓝奏云镜像待上传 · 先用 GitHub 直链'); }
+  });
+  if (MIRROR_URL){
+    mirror.setAttribute('href', MIRROR_URL);
+    mirror.setAttribute('target', '_blank');
+    mirror.setAttribute('rel', 'noopener');
+    mirror.removeAttribute('aria-disabled');
+    const sub = $('.t i', mirror);
+    if (sub && MIRROR_CODE) sub.textContent = '国内直连更快 · 提取码 ' + MIRROR_CODE;
+    const em = $('em', mirror);
+    if (em) em.textContent = '前往 ↗';
+  }
+}
+
+app.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act;
+  if (act === 'theme'){
+    app.classList.toggle('dark');
+    toast(app.classList.contains('dark') ? '夜间模式' : '日间模式');
+    return;
+  }
+  if (act === 'export'){
+    scrollToScene(5);
+    toast('导出页在第五节');
+    return;
+  }
+  if (act === 'history'){ toast('历史记录未接入这次演示'); return; }
+  if (act === 'settings' || act === 'cfg'){ toast('设置与模型配置未接入这次演示'); return; }
+  if (act === 'grade'){ toast('演示中固定为初三 · 原应用可选七个年级'); return; }
+  if (act === 'dim'){ toast('演示会随题目自动判断 2D 或 3D'); return; }
+  if (act === 'view'){ toast('演示中固定为真实尺寸'); }
+});
+
+svg3d.addEventListener('pointerdown', e => {
+  if (currentState !== '3d') return;
+  e.preventDefault();
+  dragging3 = true;
+  last3d = { x: e.clientX, y: e.clientY };
+  svg3d.setPointerCapture(e.pointerId);
+  svg3d.style.cursor = 'grabbing';
+});
+svg3d.addEventListener('pointermove', e => {
+  if (!dragging3 || !last3d) return;
+  e.preventDefault();
+  yaw += (e.clientX - last3d.x) * .008;
+  pitch = clamp(pitch + (e.clientY - last3d.y) * .005, .08, 1.2);
+  last3d = { x: e.clientX, y: e.clientY };
+  render3d(performance.now());
+});
+const end3d = e => {
+  if (!dragging3) return;
+  dragging3 = false;
+  svg3d.style.cursor = 'grab';
+  try { svg3d.releasePointerCapture(e.pointerId); } catch (err) {}
+};
+svg3d.addEventListener('pointerup', end3d);
+svg3d.addEventListener('pointercancel', end3d);
+
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href^="#s"]');
+  if (!a) return;
+  e.preventDefault();
+  const idx = Number(a.getAttribute('href').slice(2));
+  if (!Number.isNaN(idx) && scenes[idx]) scrollToScene(idx);
+});
+
+const io = new IntersectionObserver(entries => {
+  entries.forEach(en => { if (en.isIntersecting) en.target.classList.add('in'); });
+}, { threshold: .16 });
+scenes.forEach(s => io.observe(s));
+setTimeout(() => scenes[0].classList.add('in'), 80);
+
+window.addEventListener('resize', measure);
+window.addEventListener('load', measure);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+
+measure();
+const first = targetFor(0);
+applyTransform(first);
+app.style.opacity = '0';
+requestAnimationFrame(() => {
+  app.style.transition = 'opacity .9s cubic-bezier(.2,.7,.18,1)';
+  app.style.opacity = '1';
+});
+onSceneChange(0);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

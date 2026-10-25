@@ -1,4 +1,4 @@
-// 移动端导出 HTML 呈现诊断：在 402x874（iPhone 尺寸）下渲染导出页，出图 + 结构度量
+﻿// 移动端导出 HTML 呈现诊断：在 402x874（iPhone 尺寸）下渲染导出页，出图 + 结构度量
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");

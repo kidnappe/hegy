@@ -23,6 +23,7 @@
 - [快速开始](#快速开始)
 - [配置模型](#配置模型)
 - [桌面版](#桌面版)
+- [Android 手机版（实验）](#android-手机版实验)
 - [项目结构](#项目结构)
 - [工作原理](#工作原理)
 - [数据与隐私](#数据与隐私)
@@ -61,6 +62,7 @@
 
 - **浏览器**：`node solver/serve.js` 起本地服务即可。
 - **Windows 桌面版**：Electron 外壳 + electron-builder，便携版。
+- **Android 手机版**（实验）：Capacitor 外壳，复用同一套 `solver/` 前端。
 - **夜间模式**：界面支持日间 / 夜间切换。
 
 <p align="center">
@@ -151,11 +153,30 @@ npm run dist:arm64 # Windows ARM64 便携版
 
 产物在 `desktop/dist/`（已忽略，不会进仓库）。
 
-> 桌面版使用 Electron 45；安装桌面依赖需要 Node.js 22.12+。应用本体（`solver/`）仍可在 Node.js 18+ 运行。
+> 桌面版使用 Electron 26.6（Chromium 116）；安装桌面依赖需要 Node.js 18+。应用本体（`solver/`）同样在 Node.js 18+ 运行。
 
 桌面版内建服务固定使用端口 `17321`，开发态使用 `8099`，mock 使用 `8098`。便携版会把 Electron 用户数据放在 exe 同目录的 `HegyData/`。
 
 > 当前 electron-builder 配置面向 Windows x64 / ARM64；macOS / Linux 需要自行调整 `desktop/package.json` 的 `build` 段。
+
+---
+
+## Android 手机版（实验）
+
+手机端是一个 Capacitor 壳，把同一份 `solver/` 前端装进 Android WebView，界面按手机重排（半屏浮层、步骤条、底部输入）。
+
+```bash
+cd mobile
+npm install
+node tools/prepare.js            # solver + src → www
+npx cap copy android             # 复制到 android/app/src/main/assets/public
+cd android && ./gradlew.bat assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+- 目前是 **debug 包**（自签名、可侧载），未上架应用商店；架构与构建细节见 [`mobile/ARCH.md`](mobile/ARCH.md)。
+- 已知限制：非流式请求（没有 SSE 增量），长题推理期间只有阶段提示；后台被杀后任务需要手动重试。
+- 模型配置在手机端单独填写（设置 → 模型），与桌面版 `~/.hegy/settings.json` 不共用。
 
 ---
 
@@ -176,6 +197,7 @@ solver/                应用本体（浏览器端 + 本地 Node 服务）
   vendor3d/            three.js / OrbitControls / 3D 渲染内核
 
 desktop/               Electron 外壳与 electron-builder 配置
+mobile/                Android 壳（Capacitor）：src/ 手机界面 + android/ 工程
 docs/                  开发文档、截图
 tools/                 Windows + Edge 的测试 / 截图脚本（见 tools/README.md）
 
@@ -246,7 +268,7 @@ npm test          # 基础自检：文件完整性 + JS 语法 + 渲染/导出�
 - AI 生成的答案和图形都可能出错；请把它当作辅助工具，而不是标准答案。
 - 桌面打包面向 Windows x64 / ARM64；macOS / Linux 未配置，需要自行调整 `desktop/package.json`。
 - 测试 / 截图脚本以 Windows + Edge 为主，跨平台支持还不完整。
-- Electron 45 的便携包体积和启动耗时尚未在公开仓库重新实测；旧数据来自 Electron 26。
+- 便携版约 90MB、安装版约 65MB（Electron 26.6.10）；体积和冷启动耗时随 Electron 版本变化，升级后需重新实测。
 
 ---
 

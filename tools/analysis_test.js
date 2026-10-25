@@ -9,7 +9,7 @@ const EDGE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
 const PORT = 9414;
 const APP = "http://127.0.0.1:8099/solver/index.html";
 const API = "http://127.0.0.1:8099";
-const TEST_DIR = path.join(os.tmpdir(), "hegy-analysis-test");
+const TEST_DIR = "D:\\software\\tmp\\opencode\\hegy-analysis-test";
 const SHOTS = path.join(__dirname, "shots_new");
 const HOME = path.join(os.homedir(), ".hegy");
 const SETTINGS = path.join(HOME, "settings.json");
@@ -19,7 +19,7 @@ let fails = 0;
 const ok = (n, c, x) => { if (c) console.log("  ok   " + n + (x ? "  [" + x + "]" : "")); else { console.log("  FAIL " + n + (x ? "  [" + x + "]" : "")); fails++; } };
 const apiPost = async (p, b) => (await fetch(API + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b || {}) })).json();
 
-// 真实记录（Hegy 历史记录中的一条 3D 题）的解析原文：
+// 真实记录（C:\Users\Admin\Documents\Hegy\records\r1792399255048_853.json）的解析原文：
 // 模型没有写任何 $ 分隔符，直接裸写 LaTeX，且解析按选项 A：B：C：D：分段
 const REAL_ANA = [
   "以 A 为原点，AB、AC、AA₁ 分别为 x、y、z 轴：A(0,0,0)，B(3,0,0)，C(0,3,0)，A₁(0,0,3)。平面 A₁BC 为 x+y+z=3，法向量 (1,1,1)，A 到该平面距离 h=\\sqrt{3}，垂足 O=(1,1,1)。",

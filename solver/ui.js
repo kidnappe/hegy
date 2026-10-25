@@ -208,6 +208,8 @@
     if (window.JXG && JXG.JSXGraph) { try { window.board && window.board.update(); } catch (e) {} }
     // 3D 画布跟随尺寸
     if (window.HJ && HJ._onResize) HJ._onResize();
+    // 面板宽度变了（拖拽分隔条 / 收起展开），对象过滤胶囊要重新落位
+    window.HJTabs && window.HJTabs.sync($("objSeg"), false);
   }
 
   // 右栏内：解答区 / 微调区 的水平分隔拖拽
@@ -241,9 +243,35 @@
   function toggleRefine() {
     var refine = $("refine");
     if (!refine) return;
-    refine.classList.toggle("collapsed");
-    if (!refine.classList.contains("collapsed")) {
-      document.documentElement.style.setProperty("--refine-h", clamp(LAYOUT.refine, REFINE_MIN, REFINE_MAX) + "px");
+    var goingCollapsed = !refine.classList.contains("collapsed");
+    var full = clamp(LAYOUT.refine, REFINE_MIN, REFINE_MAX);
+    var reduce = false;
+    try { reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+    if (reduce) {
+      refine.classList.toggle("collapsed", goingCollapsed);
+      if (!goingCollapsed) document.documentElement.style.setProperty("--refine-h", full + "px");
+      return;
+    }
+    // beUI Bouncy Accordion：容器高度过渡（收起平滑、展开带过冲），结束后交还给 class/变量控制
+    if (goingCollapsed) {
+      refine.style.height = refine.offsetHeight + "px";
+      void refine.offsetHeight;
+      refine.style.transition = "height .26s cubic-bezier(.4,0,.2,1)";
+      refine.style.height = "34px";
+      setTimeout(function () {
+        refine.classList.add("collapsed");
+        refine.style.transition = ""; refine.style.height = "";
+      }, 275);
+    } else {
+      refine.classList.remove("collapsed");
+      document.documentElement.style.setProperty("--refine-h", full + "px");
+      refine.style.height = "34px";
+      void refine.offsetHeight;
+      refine.style.transition = "height .3s cubic-bezier(.34,1.45,.64,1)";
+      refine.style.height = full + "px";
+      setTimeout(function () {
+        refine.style.transition = ""; refine.style.height = "";
+      }, 320);
     }
   }
 
@@ -348,8 +376,8 @@
   function color2D(e) {
     try {
       var c = e.visProp && (e.visProp.strokecolor || e.visProp.fillcolor);
-      return c && c !== "none" ? c : "#8b95a1";
-    } catch (er) { return "#8b95a1"; }
+      return c && c !== "none" ? c : "var(--object-line)";
+    } catch (er) { return "var(--object-line)"; }
   }
 
   function read3D() {
@@ -412,7 +440,7 @@
         type: type,
         label: label,
         value: val,
-        color: type === "point" ? "#5b5bd6" : (type === "area" ? "#12a150" : "#8b95a1"),
+        color: type === "point" ? "var(--object-point)" : (type === "area" ? "var(--object-area)" : "var(--object-line)"),
         visible: it.vis !== false,
         raw: it
       });
@@ -426,11 +454,16 @@
     return "line";
   }
 
+  function findObj(key) {
+    var k = String(key == null ? "" : key);
+    for (var i = 0; i < OBJ.items.length; i++) if (String(OBJ.items[i].key) === k) return OBJ.items[i];
+    return null;
+  }
   function renderObjects() {
     var box = $("objList");
     if (!box) return;
     var items = OBJ.items.filter(function (o) { return OBJ.filter === "all" || o.type === OBJ.filter; });
-    $("objCount").textContent = String(OBJ.items.length);
+    window.HJFX && window.HJFX.count($("objCount"), OBJ.items.length);   // 数字滚动（beUI Number Animation）
     box.innerHTML = "";
     // 选中项若已不在当前对象列表里，清空选中（样式面板随之收起）
     var selOk = false;
@@ -447,7 +480,10 @@
       row.dataset.key = o.key;
 
       var dot = el("span", "cdot" + (o.type === "area" ? " sq" : "") + (o.type === "point" ? "" : ""));
-      dot.style.background = o.color;
+      // 色点默认用图元自身颜色（内容色）；皮肤 palette 可整体覆盖
+      // （swiss 拍板：对象点压黑白，靠类型文字区分；palette 里没有就不动）
+      var palDot = (window.HJSkin && HJSkin.palette && HJSkin.palette().objectDot) || null;
+      dot.style.background = palDot || o.color;
       row.appendChild(dot);
 
       row.appendChild(el("span", "nm", o.label));
@@ -474,7 +510,13 @@
       box.appendChild(row);
     });
     renderObjStyle();
+    try { document.dispatchEvent(new CustomEvent("hj-objects-changed")); } catch (e) {}
   }
+
+  // 皮肤切换 → 对象列表重渲染（色点颜色可能随 palette 变，如 swiss 压黑白）
+  document.addEventListener("hj:skin", function () {
+    try { if (OBJ && OBJ.items && OBJ.items.length) renderObjects(); } catch (e) {}
+  });
 
   // 选中对象 → 左栏底部「对象样式」滑杆
   // 2D：点大小 / 线宽；3D：小球大小 / 球半径 / 线宽。
@@ -560,12 +602,21 @@
     }
   }
 
-  function selectObject(o) {
+  function selectObject(o, opts) {
     OBJ.sel = o.key;
     OBJ.styleOff = false;   // 重新点选元素时，样式面板再次出现
     renderObjects();
     if (OBJ.source === "2d") highlight2D(o.key);
-    else focusObject(o);
+    else if (opts && opts.focus === false) {
+      // 画布上点选：只高亮，不把相机拉到对象脸上（定位交给属性条的准星）
+      var api = window.GGB3D && window.GGB3D.getApi ? window.GGB3D.getApi() : null;
+      if (api) {
+        try { if (api.clearHighlight) api.clearHighlight(); } catch (e) {}
+        var it = api.byId && api.byId[String(o.key)];
+        if (it && api.highlight) { try { api.highlight(it); } catch (e2) {} }
+      }
+    } else focusObject(o);
+    try { document.dispatchEvent(new CustomEvent("hj-object-selected", { detail: { key: String(o.key) } })); } catch (e) {}
   }
   // 画布元素悬停 → 左侧对象行高亮 + 自动滚动到该行；同时在画布上高亮元素本身（2D/3D 共用）
   var HOVER = { key: null, source: null };
@@ -675,8 +726,31 @@
       [e.rendNode, e.rendNode2].forEach(function (node) {
         if (!node || node.__hjHoverName) return;
         node.__hjHoverName = name;
-        node.addEventListener("pointerenter", function () { hoverObject(this.__hjHoverName); });
-        node.addEventListener("pointerleave", function () { hoverObject(null); });
+        node.addEventListener("pointerenter", function (ev) {
+          if (ev && ev.pointerType === "touch") return;
+          hoverObject(this.__hjHoverName);
+        });
+        node.addEventListener("pointerleave", function (ev) {
+          if (ev && ev.pointerType === "touch") return;
+          hoverObject(null);
+        });
+        if (!node.__hjTapName) {
+          node.__hjTapName = name;
+          var tap0 = null;
+          node.addEventListener("pointerdown", function (ev) {
+            if (ev.pointerType === "touch") hoverObject(null);
+            tap0 = { x: ev.clientX, y: ev.clientY };
+          });
+          node.addEventListener("pointerup", function (ev) {
+            if (!tap0) return;
+            var d = Math.abs(ev.clientX - tap0.x) + Math.abs(ev.clientY - tap0.y);
+            tap0 = null;
+            if (d > 10) return;   // 拖动元素不算点选
+            if (window.HJMobile && window.HJMobile.onCanvasObject) {
+              window.HJMobile.onCanvasObject(this.__hjTapName);
+            }
+          });
+        }
       });
     }
   }
@@ -789,11 +863,11 @@
     if (!bar) return;
     var n = STEPS.items.length, c = STEPS.cur;
     var idxEl = bar.querySelector(".idx");
-    if (idxEl) idxEl.textContent = (c < 0 ? "全部" : (c + 1) + " / " + n);
+    if (idxEl) idxEl.textContent = c < 0 ? "全部" : (isMobileView() ? "第 " + (c + 1) + "/" + n + " 步" : (c + 1) + " / " + n);
     var s = c >= 0 ? STEPS.items[c] : null;
     var ttl = bar.querySelector(".ttl");
     if (ttl) {
-      var tt = s ? (s.title || "") : "";
+      var tt = s ? (s.title || "") : ("共 " + n + " 步");
       // 标题里可能带 $...$（如「两个夹角 $\alpha,\beta$」）：有 LaTeX 就走 KaTeX，否则纯文本
       if (tt && /[\\$]/.test(tt) && window.mathHTML) ttl.innerHTML = window.mathHTML(tt);
       else ttl.textContent = texPlain(tt);
@@ -887,26 +961,46 @@
     if (!wrap) return;
     wrap.innerHTML = "";
     var found = [];
+    var direct = [];
+    var mobile = document.documentElement.classList.contains("m-mobile");
     // 脚本常把按钮容器 append 到 #ggb-canvas 里，也可能是 #canvasHost 的直接子元素
     var scope = host.querySelector("#ggb-canvas") || host;
     Array.prototype.slice.call(scope.querySelectorAll("div")).forEach(function (c) {
       if (!c || c.id === "ggb-canvas" || c.tagName === "svg") return;
       if (!c.querySelector || !c.querySelector("button")) return;
       if (c.closest("#scriptUi")) return;
-      if (c.__hjTaken) return;
       found.push(c);
     });
-    if (!found.length) return;
+    // 手机端还有直接挂在 #ggb-canvas 下的按钮（例如“定位图1/2/3”），
+    // 它们不在任何 div 里，上面的扫描找不到；这里补扫直接子节点，收进浮层的脚本区。
+    if (mobile) {
+      Array.prototype.slice.call(scope.children || []).forEach(function (c) {
+        if (!c || c.id === "ggb-canvas" || c.tagName === "svg") return;
+        if (found.indexOf(c) >= 0) return;
+        if (c.tagName === "BUTTON") { direct.push(c); return; }
+        if (c.querySelector && c.querySelector("button")) direct.push(c);
+      });
+    }
+    if (!found.length && !direct.length) return;
     var bar = wrap.querySelector(".legacybar");
     if (!bar) { bar = el("div", "legacybar"); wrap.appendChild(bar); }
-    found.forEach(function (n) {
-      n.__hjTaken = true;
-      Array.prototype.slice.call(n.querySelectorAll("button")).forEach(function (b) {
+    var seen = [];
+    function take(btns) {
+      Array.prototype.slice.call(btns || []).forEach(function (b) {
+        if (!b || seen.indexOf(b) >= 0) return;
+        seen.push(b);
         var nb = el("button", null, b.textContent);
         nb.onclick = function () { try { b.click(); } catch (e) {} };
         bar.appendChild(nb);
       });
+    }
+    found.forEach(function (n) {
+      take(n.querySelectorAll("button"));
       n.style.display = "none"; // 原浮层隐藏
+    });
+    direct.forEach(function (n) {
+      take(n.tagName === "BUTTON" ? [n] : n.querySelectorAll("button"));
+      try { n.style.display = "none"; } catch (e) {}
     });
   }
 
@@ -917,8 +1011,11 @@
   var _3dInit = null;  // 3D 初始相机
 
   function resetView() {
-    if (OBJ.source === "2d" && window.board && _bbox0) {
-      try { window.board.setBoundingBox(_bbox0.slice()); window.board.update(); } catch (e) {}
+    if (OBJ.source === "2d" && window.board) {
+      NAV.userMoved = false;
+      // 手机上记录里的 bbox 是给整屏的；复位要回到「当前能看见的画布」里的内容取景
+      if (isMobileView() && fitVisible2D(true)) return;
+      if (_bbox0) try { window.board.setBoundingBox(_bbox0.slice()); window.board.update(); } catch (e) {}
     } else if (window.GGB3D && window.GGB3D.resetView) {
       try { window.GGB3D.resetView(); } catch (e) {}
     }
@@ -945,8 +1042,19 @@
     if (s) s.textContent = text;
   }
 
-  /* ---- 轻提示（toast）：用于导入/导出等需要明确回执又不想被状态栏覆盖的场景 ---- */
-  var _toastTimer = null;
+  /* ---- 轻提示（toast）：用于导入/导出等需要明确回执又不想被状态栏覆盖的场景 ----
+     beUI Animated Toast Stack：最多同时 3 条，新条 spring 弹入，旧条自动退场，
+     退场时高度塌缩让下面的条平滑上移（动画口径见 ui.css #toastHost） */
+  function toastOut(t) {
+    if (!t || t.classList.contains("out")) return;
+    // 先把当前高度钉成 inline（inline 才能压住基类的 max-height:80px），
+    // 强制回流后再 inline 归零——两条 inline 之间才有可过渡的高度差
+    t.style.maxHeight = t.offsetHeight + "px";
+    void t.offsetWidth;
+    t.classList.add("out");
+    t.style.maxHeight = "0px";
+    setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 340);
+  }
   function toast(text, kind, ms) {
     var host = $("toastHost");
     if (!host) {
@@ -954,17 +1062,14 @@
       host.id = "toastHost";
       document.body.appendChild(host);
     }
-    host.innerHTML = "";
+    var olds = host.querySelectorAll(".toast:not(.out)");
+    for (var i = 0; i < olds.length; i++) if (olds.length - i >= 3) toastOut(olds[i]);
     var t = el("div", "toast" + (kind ? " " + kind : ""));
     t.innerHTML = icon(kind === "bad" ? "x" : "check", "ico-sm") + "<span>" + text + "</span>";
     host.appendChild(t);
-    // 触发进入动画
-    requestAnimationFrame(function () { t.classList.add("in"); });
-    if (_toastTimer) clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(function () {
-      t.classList.remove("in");
-      setTimeout(function () { if (host) host.innerHTML = ""; }, 220);
-    }, ms || 3200);
+    // 触发进入动画（双 rAF：确保初始态先上屏，过渡/动画才跑得起来）
+    requestAnimationFrame(function () { requestAnimationFrame(function () { t.classList.add("in"); }); });
+    setTimeout(function () { toastOut(t); }, ms || 3200);
     return t;
   }
 
@@ -1018,6 +1123,9 @@
       extractScriptUI($("canvasHost"));
       showWelcome(false);
       startMeasureLoop();
+      // 新记录/新版本：用户视角从零开始，等布局稳定后按可见画布取景
+      NAV.userMoved = false;
+      scheduleFitVisible(120);
     },
     refresh2D: refresh2D,
 
@@ -1026,6 +1134,8 @@
       OBJ.source = "3d";
       _bbox0 = null;
       VIEW.hid3d = {};
+      // 上一张 2D 记录的脚本按钮不能留在 3D 的解答浮层里
+      var sui = $("scriptUi"); if (sui) sui.innerHTML = "";
       var api = window.GGB3D && window.GGB3D.getApi ? window.GGB3D.getApi() : null;
       refresh3D();
       HJ._focusTargets = (scene && scene.focusTargets) || [];
@@ -1066,6 +1176,15 @@
     setMeasure: setMeasure,
     setSteps: buildSteps,
     hoverObject: hoverObject,
+    objectInfo: function (key) {
+      var o = findObj(key);
+      if (!o) return null;
+      return { key: String(o.key), label: o.label, type: o.type, visible: !!o.visible, color: o.color };
+    },
+    selectObjectByKey: function (key, focus) { var o = findObj(key); if (o) selectObject(o, { focus: focus !== false }); },
+    toggleObjectByKey: function (key) { var o = findObj(key); if (o) toggleObject(o); },
+    focusObjectByKey: function (key) { var o = findObj(key); if (o) focusObject(o); },
+    selectedObjectKey: function () { return OBJ.sel; },
     _friendly: friendlyName,
     _icon: icon,
     _locate: function (ft) {
@@ -1073,6 +1192,7 @@
       if (window.HJ._locateImpl) return HJ._locateImpl(ft);
     },
     _locateImpl: null,
+    _fitVisible2D: function () { return fitVisible2D(true); },
     _onResize: null
   };
 
@@ -1216,6 +1336,7 @@
     // 注意：不能清 VIEW.hid2d/hid3d——那是「被我隐藏过、原始状态是什么」的账本，
     // 清掉就再也还原不回来了。新渲染时才作废。
     applyView();
+    if (OBJ.source === "2d") scheduleFitVisible(120);
   }
 
   /* ---- 2D 步骤应用 ---- */
@@ -1412,6 +1533,12 @@
     });
   }
 
+  // 轨道填充量：给 input[type=range] 写 --p（已滑过部分的百分比），CSS 用它画双色轨道
+  function sldFill(inp) {
+    var mn = Number(inp.min), mx = Number(inp.max), v = Number(inp.value);
+    if (!isFinite(mn) || !isFinite(mx) || mx <= mn) return;
+    inp.style.setProperty("--p", (clamp((v - mn) / (mx - mn), 0, 1) * 100).toFixed(2) + "%");
+  }
   function renderSliders(host, sliders) {    if (!sliders.length) return;
     // 「复位」要记住每个滑块渲染时的初始值（JSXGraph 的滑块没有 defaultValue 字段）
     var items = [];
@@ -1447,11 +1574,13 @@
       if (!isFinite(st) || st <= 0) st = (mx - mn) / 100;
       inp.min = mn; inp.max = mx; inp.step = st; inp.value = cur;
       val.textContent = fmtNum(cur);
+      sldFill(inp);
       inp.oninput = function () {
         var v = Number(inp.value);
         try { s.setValue(v); } catch (er) {}
         try { window.board.update(); } catch (er) {}
         val.textContent = fmtNum(v);
+        sldFill(inp);
       };
       row.appendChild(inp);
       host.appendChild(row);
@@ -1462,6 +1591,7 @@
         try { it.s.setValue(it.init); } catch (er) {}
         it.inp.value = it.init;
         it.val.textContent = fmtNum(it.init);
+        sldFill(it.inp);
       });
       try { window.board.update(); } catch (er) {}
       try { if (window.HJ && window.HJ._afterSliderReset) window.HJ._afterSliderReset(); } catch (er) {}
@@ -1496,9 +1626,11 @@
       inp.type = "range";
       inp.min = Number(s.min) || 0; inp.max = Number(s.max) || 1;
       inp.step = Number(s.step) || 0.01; inp.value = Number(s.value) || 0;
+      sldFill(inp);
       inp.oninput = function () {
         s.value = Number(inp.value);
         val.textContent = fmtNum(s.value);
+        sldFill(inp);
         var api = window.GGB3D && window.GGB3D.getApi ? window.GGB3D.getApi() : null;
         if (api && api.refresh) api.refresh();
         refresh3D();
@@ -1513,6 +1645,7 @@
         it.s.value = it.init;
         it.inp.value = it.init;
         it.val.textContent = fmtNum(it.init);
+        sldFill(it.inp);
       });
       var api = window.GGB3D && window.GGB3D.getApi ? window.GGB3D.getApi() : null;
       if (api && api.refresh) api.refresh();
@@ -1554,7 +1687,7 @@
      说明：JSXGraph 自带 pan/zoom 需要 Shift 才生效，这里直接接管，
           并且不删除原有任何控件（工具栏按钮、自带导航条都在）。
      ========================================================= */
-  var NAV = { wheelStep: 0.12, dragPx: 1.0, keyStep: 0.06, bound: false };
+  var NAV = { wheelStep: 0.12, dragPx: 1.0, keyStep: 0.06, bound: false, userMoved: false, fitTimer: null };
 
   function boardBB() {
     try { return window.board ? window.board.getBoundingBox() : null; } catch (e) { return null; }
@@ -1587,6 +1720,7 @@
     if (w < 1e-4 || h < 1e-4) return;
     if (w > 1e5 || h > 1e5) return;
     setBB([nx0, ny1, nx1, ny0]);
+    NAV.userMoved = true;
     afterNav();
   }
   function panBy(dxPx, dyPx) {
@@ -1601,10 +1735,178 @@
     var perY = (y0 - y1) / r.height;
     var ox = dxPx * perX, oy = dyPx * perY;
     setBB([x0 - ox, y1 - oy, x1 - ox, y0 - oy]);
+    NAV.userMoved = true;
     afterNav();
   }
   function afterNav() {
     // 记录中若开启了「网格/坐标轴」，缩放后 JSXGraph 会自己重绘，无需处理
+  }
+
+  /* ---------------- 2D 可见画布取景 ----------------
+     手机浮层只露出 #stage 的一条带子，顶部还压着工具栏/测量。
+     记录里的 boundingbox 是给整屏的，直接用它会让图在"整面墙"里居中。
+     这里按真正能看见的矩形重新装图：内容取当前可见图元的实际渲染框，
+     四周留 12% 边距，等比放大后居中在可见带子里。 */
+  function isMobileView() {
+    try {
+      if (document.documentElement.classList.contains("m-mobile")) return true;
+      return !!(window.matchMedia && window.matchMedia("(max-width:760px)").matches);
+    } catch (e) { return false; }
+  }
+  function scheduleFitVisible(delay) {
+    if (OBJ.source !== "2d" || !window.board || !isMobileView()) return;
+    clearTimeout(NAV.fitTimer);
+    NAV.fitTimer = setTimeout(function () {
+      NAV.fitTimer = null;
+      if (NAV.userMoved) return;
+      fitVisible2D(false);
+    }, delay || 120);
+  }
+  function pxToUser(px, py, g, W, H) {
+    var sx = g.width ? W / g.width : 1;
+    var sy = g.height ? H / g.height : 1;
+    var c = new JXG.Coords(JXG.COORDS_BY_SCREEN, [(px - g.left) * sx, (py - g.top) * sy], window.board).usrCoords;
+    return [c[1], c[2]];
+  }
+  function elRendered(e) {
+    if (!e || (e.visProp && e.visProp.visible === false)) return false;
+    var n = e.rendNode;
+    if (!n) return false;
+    try {
+      if (n.getAttribute && n.getAttribute("display") === "none") return false;
+      if (n.style && n.style.display === "none") return false;
+      if (n.nodeType === 1) {
+        var cs = getComputedStyle(n);
+        if (cs.display === "none" || cs.visibility === "hidden") return false;
+      }
+    } catch (er) {}
+    return true;
+  }
+  function visibleContentBB() {
+    var b = window.board;
+    var host = $("ggb-canvas");
+    if (!b || !b.objectsList || !host) return null;
+    var g = host.getBoundingClientRect();
+    if (!g.width || !g.height) return null;
+    var W = b.canvasWidth || g.width, H = b.canvasHeight || g.height;
+    var SKIP = { axis: 1, grid: 1, ticks: 1, slider: 1, button: 1, checkbox: 1, input: 1, infobox: 1 };
+    var skipIds = {}, labelSkip = {};
+    b.objectsList.forEach(function (e) {
+      if (!e) return;
+      var t = String(e.elType || "");
+      if (!SKIP[t] && !/_infobox$/i.test(String(e.id || ""))) return;
+      skipIds[e.id] = 1;
+      if (e.label && e.label.id) labelSkip[e.label.id] = 1;
+    });
+    function underSkipped(e) {
+      if (e.id && (skipIds[e.id] || labelSkip[e.id] || /_infobox$/i.test(String(e.id || "")))) return true;
+      if (e.ancestors) {
+        for (var k in e.ancestors) if (skipIds[k]) return true;
+      }
+      return false;
+    }
+    // 直线/曲线在画布上是无限延伸的：不能按当前渲染框取景，
+    // 否则它会一直占满整个画布，每次 resize 都再放大一圈（视图越跑越远）。
+    // 用记录原始视窗做参考系，只取落在其中的采样点，结果跨 resize 稳定。
+    var ref = (_bbox0 && _bbox0.length === 4) ? _bbox0 : b.getBoundingBox();
+    var rx0 = Math.min(ref[0], ref[2]), rx1 = Math.max(ref[0], ref[2]);
+    var ry0 = Math.min(ref[1], ref[3]), ry1 = Math.max(ref[1], ref[3]);
+    function curveBB(e) {
+      var pts = e.points || [], x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, n = 0;
+      for (var i = 0; i < pts.length; i++) {
+        var u = pts[i] && pts[i].usrCoords;
+        if (!u) continue;
+        var x = u[1], y = u[2];
+        if (!isFinite(x) || !isFinite(y)) continue;
+        if (x < rx0 || x > rx1 || y < ry0 || y > ry1) continue;
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+        y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+        n++;
+      }
+      if (n) return [x0, y0, x1, y1];
+      try {
+        var bb = e.bounds();
+        if (bb && isFinite(bb[0]) && isFinite(bb[1]) && isFinite(bb[2]) && isFinite(bb[3])) {
+          var a = Math.max(Math.min(bb[0], bb[2]), rx0), c = Math.min(Math.max(bb[0], bb[2]), rx1);
+          var d = Math.max(Math.min(bb[1], bb[3]), ry0), f = Math.min(Math.max(bb[1], bb[3]), ry1);
+          if (c > a && f > d) return [a, d, c, f];
+        }
+      } catch (er) {}
+      return null;
+    }
+    var xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity, n = 0;
+    b.objectsList.forEach(function (e) {
+      if (!e) return;
+      var t = String(e.elType || "");
+      if (SKIP[t] || underSkipped(e) || !elRendered(e)) return;
+      if (t === "line" || t === "curve" || t === "functiongraph") {
+        var cb = curveBB(e);
+        if (!cb) return;
+        xmin = Math.min(xmin, cb[0]); xmax = Math.max(xmax, cb[2]);
+        ymin = Math.min(ymin, cb[1]); ymax = Math.max(ymax, cb[3]);
+        n++;
+        return;
+      }
+      var r = null;
+      try { r = e.rendNode.getBoundingClientRect ? e.rendNode.getBoundingClientRect() : null; } catch (er) {}
+      if (!r || (r.width < 0.5 && r.height < 0.5)) return;
+      var l = r.left, tp = r.top, rr = r.right, bt = r.bottom;
+      var a = pxToUser(l, tp, g, W, H), c = pxToUser(rr, bt, g, W, H);
+      xmin = Math.min(xmin, a[0], c[0]); xmax = Math.max(xmax, a[0], c[0]);
+      ymin = Math.min(ymin, a[1], c[1]); ymax = Math.max(ymax, a[1], c[1]);
+      n++;
+    });
+    if (!n || !isFinite(xmin) || !isFinite(ymin) || !isFinite(xmax) || !isFinite(ymax)) return null;
+    // 水平/竖直的图（例如 y=1 的函数图）只有一个方向有跨度，交给留白去补
+    if (xmax < xmin || ymax < ymin) return null;
+    if (xmax === xmin && ymax === ymin) return null;
+    return { xmin: xmin, ymin: ymin, xmax: xmax, ymax: ymax, W: W, H: H, g: g };
+  }
+  function visibleTargetBB(c) {
+    var padPx = 10, top = padPx;
+    var st = $("stageTop");
+    if (st) {
+      var sr = st.getBoundingClientRect();
+      if (sr.height > 0) top = Math.max(top, (sr.bottom - c.g.top) * c.H / c.g.height + 6);
+    }
+    var me = $("measure");
+    if (me) {
+      var mr = me.getBoundingClientRect();
+      if (mr.height > 0 && getComputedStyle(me).display !== "none") {
+        top = Math.max(top, (mr.bottom - c.g.top) * c.H / c.g.height + 6);
+      }
+    }
+    var left = padPx, right = c.W - padPx, bottom = c.H - padPx;
+    if (right - left < 60 || bottom - top < 60) return null;
+    var cw = c.xmax - c.xmin, ch = c.ymax - c.ymin;
+    var padX = Math.max(cw * 0.12, Math.max(cw, ch) * 0.01);
+    var padY = Math.max(ch * 0.12, Math.max(cw, ch) * 0.01);
+    var bx0 = c.xmin - padX, bx1 = c.xmax + padX;
+    var by0 = c.ymin - padY, by1 = c.ymax + padY;
+    var bw = bx1 - bx0, bh = by1 - by0;
+    if (!(bw > 0) || !(bh > 0)) return null;
+    var uw = right - left, uh = bottom - top;
+    var s = Math.max(bw / uw, bh / uh);
+    if (!isFinite(s) || s <= 0) return null;
+    var ucx = (left + right) / 2, ucy = (top + bottom) / 2;
+    var cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2;
+    var xmin = cx - s * ucx, xmax = xmin + s * c.W;
+    var ymax = cy + s * ucy, ymin = ymax - s * c.H;
+    if (!isFinite(xmin) || !isFinite(xmax) || !isFinite(ymin) || !isFinite(ymax)) return null;
+    return [xmin, ymax, xmax, ymin];
+  }
+  function fitVisible2D(force) {
+    if (OBJ.source !== "2d" || !window.board || !window.JXG) return false;
+    if (!force && NAV.userMoved) return false;
+    var c = visibleContentBB();
+    if (!c) return false;
+    var bb = visibleTargetBB(c);
+    if (!bb) return false;
+    try {
+      window.board.setBoundingBox(bb, true);
+      window.board.update();
+      return true;
+    } catch (e) { return false; }
   }
 
   function init2DNav() {
@@ -1678,11 +1980,555 @@
   }
 
   /* =========================================================
+     分段标签弹簧指示器 —— beUI motion tabs（beui.dev）的原生移植
+     原组件用 framer-motion 的 layoutId 弹簧胶囊：
+     spring(stiffness 170 / damping 24 / mass 1.2)，切换时胶囊带一点过冲地
+     滑向新标签；内容区 0.18s 淡入 + 4px 上移（CSS 端见 ui.css 的 hjSwapIn）。
+     这里用 rAF 半隐式欧拉积分逐帧驱动指示块的位移与宽度，复刻同款手感；
+     指示块位置记在容器（_tabFrom）上，跨重建（innerHTML 清空重挂）也能
+     从旧位置续滑，等价 layoutId 的跨重挂载续接。
+     泛化：任何「button.on 表示选中」的分段容器都能用（sync 会把纯文本按钮
+     自动包一层 .lbl，好让文字垫在胶囊之上）；hover() 再加一颗跟随悬停的
+     次级胶囊（beUI Shared Layout Background，触屏无 hover 时自然不出现）。
+   ========================================================= */
+  var HJTabs = window.HJTabs = (function () {
+    var STIFF = 170, DAMP = 24, MASS = 1.2;   // beUI 的弹簧参数
+    var SETTLE_P = 0.4, SETTLE_V = 30;        // 收敛阈值（px / px·s⁻¹）
+    function reducedMotion() {
+      try { return window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches; }
+      catch (e) { return false; }
+    }
+    // 纯文本按钮包一层 .lbl：胶囊(z1)要垫在文字(z2)之下、按钮底色之上（分层见 ui.css）
+    function wrapLabels(box) {
+      var bs = box.querySelectorAll("button");
+      for (var i = 0; i < bs.length; i++) {
+        var b = bs[i];
+        if (b.firstElementChild) continue;
+        var sp = document.createElement("span");
+        sp.className = "lbl";
+        sp.textContent = b.textContent;
+        b.textContent = "";
+        b.appendChild(sp);
+      }
+    }
+    function targetOf(box) {
+      wrapLabels(box);
+      var on = box.querySelector("button.on");
+      if (!on) return null;
+      // 竖排容器（flex-direction: column，如手机端小问下拉弹层）：弹簧改驱动 y/height，
+      // 横排驱动 x/width——统一存四值，静止的两维起点=终点、弹簧自然不动
+      var vert = false;
+      try { vert = String(getComputedStyle(box).flexDirection || "").indexOf("column") === 0; } catch (e) {}
+      return { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight, vert: vert };
+    }
+    // 帧率无关：真实 dt 拆成 ≤8ms 的子步积分，掉帧时弹簧曲线不失真
+    function step(pos, vel, target, dt) {
+      var left = Math.min(dt, 0.05);
+      while (left > 1e-6) {
+        var h = Math.min(0.008, left); left -= h;
+        vel += ((-STIFF * (pos - target)) - DAMP * vel) / MASS * h;
+        pos += vel * h;
+      }
+      return [pos, vel];
+    }
+    // sfx 区分同一容器上的两颗胶囊：""=选中胶囊、"_hov"=悬停胶囊
+    function drive(box, ind, from, to, sfx) {
+      var kRaf = "_tabRaf" + sfx, kFrom = "_tabFrom" + sfx;
+      if (box[kRaf]) cancelAnimationFrame(box[kRaf]);
+      if (reducedMotion()) return snap(box, ind, to, sfx);
+      var st = { x: from.x, y: from.y, w: from.w, h: from.h, xv: 0, yv: 0, wv: 0, hv: 0 }, last = performance.now();
+      box[kFrom] = { x: st.x, y: st.y, w: st.w, h: st.h, vert: to.vert };   // 中途再换目标时从这里续滑
+      (function frame(now) {
+        var dt = Math.min(Math.max((now - last) / 1000, 0), 0.05); last = now;
+        var rx = step(st.x, st.xv, to.x, dt), rw = step(st.w, st.wv, to.w, dt);
+        var ry = step(st.y, st.yv, to.y, dt), rh = step(st.h, st.hv, to.h, dt);
+        st.x = rx[0]; st.xv = rx[1]; st.w = rw[0]; st.wv = rw[1];
+        st.y = ry[0]; st.yv = ry[1]; st.h = rh[0]; st.hv = rh[1];
+        var settled = Math.abs(st.x - to.x) < SETTLE_P && Math.abs(st.xv) < SETTLE_V &&
+                      Math.abs(st.w - to.w) < SETTLE_P && Math.abs(st.wv) < SETTLE_V &&
+                      Math.abs(st.y - to.y) < SETTLE_P && Math.abs(st.yv) < SETTLE_V &&
+                      Math.abs(st.h - to.h) < SETTLE_P && Math.abs(st.hv) < SETTLE_V;
+        if (settled) { st.x = to.x; st.y = to.y; st.w = to.w; st.h = to.h; }
+        ind.style.transform = "translate(" + st.x.toFixed(2) + "px," + st.y.toFixed(2) + "px)";
+        ind.style.width = Math.max(0, st.w).toFixed(2) + "px";
+        ind.style.height = Math.max(0, st.h).toFixed(2) + "px";
+        box[kFrom] = { x: st.x, y: st.y, w: st.w, h: st.h, vert: to.vert };
+        if (settled) { box[kRaf] = 0; return; }
+        box[kRaf] = requestAnimationFrame(frame);
+      })(performance.now());
+    }
+    function snap(box, ind, t, sfx) {
+      var kRaf = "_tabRaf" + sfx, kFrom = "_tabFrom" + sfx;
+      if (box[kRaf]) { cancelAnimationFrame(box[kRaf]); box[kRaf] = 0; }
+      ind.style.transform = "translate(" + t.x.toFixed(2) + "px," + t.y.toFixed(2) + "px)";
+      ind.style.width = t.w.toFixed(2) + "px";
+      ind.style.height = t.h.toFixed(2) + "px";
+      box[kFrom] = { x: t.x, y: t.y, w: t.w, h: t.h, vert: t.vert };
+    }
+    function ensureInd(box, cls) {
+      var ind = cls ? box.querySelector(".tab-ind." + cls) : box.querySelector(".tab-ind:not(.tab-hov)");
+      if (!ind) {
+        ind = document.createElement("span");
+        ind.className = "tab-ind" + (cls ? " " + cls : "");
+        ind.setAttribute("aria-hidden", "true");
+        box.insertBefore(ind, box.firstChild);
+      }
+      return ind;
+    }
+    // 重建按钮后调用。glide=false 时直接落位（首次出现 / 位置没变 / 减动效都走这里）。
+    // 容器不可见（offsetWidth 为 0）时只清状态，等可见后下一次 sync 再落位。
+    function sync(box, glideIt) {
+      if (!box) return;
+      var ind = ensureInd(box, null);
+      if (!box.offsetWidth) { ind.style.width = "0px"; ind.style.height = "0px"; box._tabFrom = null; return; }
+      var t = targetOf(box);
+      if (!t) { ind.style.width = "0px"; ind.style.height = "0px"; box._tabFrom = null; return; }
+      var from = box._tabFrom;
+      if (!glideIt || !from || from.vert !== t.vert ||
+          (Math.abs(from.x - t.x) < 1 && Math.abs(from.w - t.w) < 1 &&
+           Math.abs(from.y - t.y) < 1 && Math.abs(from.h - t.h) < 1)) snap(box, ind, t, "");
+      else drive(box, ind, from, t, "");
+    }
+    // beUI Shared Layout Background：悬停胶囊在非选中项之间弹性游走，移开即淡出
+    function hover(box) {
+      if (!box || box._hovWired) return;
+      box._hovWired = true;
+      var ind = ensureInd(box, "tab-hov");
+      ind.style.opacity = "0";
+      box.addEventListener("mouseover", function (e) {
+        var b = e.target && e.target.closest ? e.target.closest("button") : null;
+        if (!b || !box.contains(b) || b.classList.contains("on")) { ind.style.opacity = "0"; return; }
+        ind.style.opacity = "1";   // CSS 基类是 opacity:0，必须显式写 1 才可见
+        var from = box._hovFrom || { x: b.offsetLeft, y: b.offsetTop, w: 0, h: b.offsetHeight, vert: false };
+        place(box, ind, from, { x: b.offsetLeft, y: b.offsetTop, w: b.offsetWidth, h: b.offsetHeight, vert: false }, "_hov", true);
+      });
+      box.addEventListener("mouseleave", function () {
+        ind.style.opacity = "0";
+        if (box._hovRaf) { cancelAnimationFrame(box._hovRaf); box._hovRaf = 0; }
+        if (box._hovFrom) box._hovFrom.w = 0;
+      });
+    }
+    function place(box, ind, from, to, sfx, glideIt) {
+      if (!glideIt || !from ||
+          (Math.abs(from.x - to.x) < 1 && Math.abs(from.w - to.w) < 1)) snap(box, ind, to, sfx);
+      else drive(box, ind, from, to, sfx);
+    }
+    // 内容切换淡入（beUI 的 0.18s + 4px 上移）；重复触发前先摘类再强制回流
+    function swapIn(elm) {
+      if (!elm || reducedMotion()) return;
+      elm.classList.remove("hj-swap");
+      void elm.offsetWidth;
+      elm.classList.add("hj-swap");
+    }
+    return { sync: sync, swapIn: swapIn, hover: hover };
+  })();
+
+  /* =========================================================
+     桌面端自定义下拉 —— beUI Select / Shared Layout Background 的移植
+     ---------------------------------------------------------
+     原生 select 在 Windows/Electron 里只能改触发器外观，弹层永远是系统样式，
+     和本项目的弹簧动效不在一个语汇里。这里保留原生 select 作为数据源（值、
+     change 事件、读屏语义都还在），视觉层换成按钮 + 自绘 listbox：
+       · 触发器按下微缩、展开时 chevron 旋转（spring 曲线）
+       · 弹层从触发器底部 6px 处淡入并轻轻放大，选中项对勾带过冲弹出
+       · ↑/↓/Home/End/Enter/Esc 全键盘可用，焦点始终留在触发器上
+     只在 ≥761px 初始化；手机端仍走 mobile.css / mobile-sheet.js 的原生流程。
+     ========================================================= */
+  var HJSelect = window.HJSelect = (function () {
+    var openInst = null, seq = 0;
+
+    function isDesktop() {
+      try {
+        if (document.documentElement.classList.contains("m-mobile")) return false;
+        return !(window.matchMedia && window.matchMedia("(max-width:760px)").matches);
+      } catch (e) { return true; }
+    }
+    function chevSvg() {
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg>';
+    }
+    function checkSvg() {
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.2 16.7 19 7"/></svg>';
+    }
+    // label 的 textContent 会把 <option> 也算进去，这里只取直接文本节点（"年级"）
+    function labelText(node) {
+      var s = "";
+      for (var i = 0; i < node.childNodes.length; i++) {
+        if (node.childNodes[i].nodeType === 3) s += node.childNodes[i].nodeValue;
+      }
+      return s.replace(/\s+/g, " ").trim();
+    }
+    function readOptions(sel) {
+      var out = [];
+      for (var i = 0; i < sel.children.length; i++) {
+        var n = sel.children[i];
+        if (n.tagName === "OPTGROUP") {
+          if (n.label) out.push({ group: n.label });
+          for (var j = 0; j < n.children.length; j++) {
+            var o = n.children[j];
+            if (o.tagName === "OPTION") out.push({ value: o.value, label: (o.textContent || "").trim(), disabled: o.disabled });
+          }
+        } else if (n.tagName === "OPTION") {
+          out.push({ value: n.value, label: (n.textContent || "").trim(), disabled: n.disabled });
+        }
+      }
+      return out;
+    }
+    function markOn(inst) {
+      var v = inst.sel.value;
+      for (var i = 0; i < inst.optionEls.length; i++) {
+        var on = inst.optionEls[i].dataset.value === v;
+        inst.optionEls[i].classList.toggle("on", on);
+        inst.optionEls[i].setAttribute("aria-selected", on ? "true" : "false");
+      }
+    }
+    function sync(sel) {
+      var inst = sel && sel.__hjsel;
+      if (!inst) return;
+      var opt = sel.options[sel.selectedIndex];
+      var text = opt ? (opt.textContent || "").trim() : "";
+      inst.valEl.textContent = text || "—";
+      inst.btn.setAttribute("aria-label", (inst.caption ? inst.caption + "：" : "") + (text || "未选择"));
+      if (inst.optionEls) markOn(inst);
+    }
+    function build(inst) {
+      var pop = inst.pop;
+      pop.innerHTML = "";
+      inst.optionEls = [];
+      inst.values = [];
+      var list = readOptions(inst.sel);
+      for (var i = 0; i < list.length; i++) {
+        var o = list[i];
+        if (o.group) {
+          var gh = document.createElement("div");
+          gh.className = "hjsel-group";
+          gh.textContent = o.group;
+          pop.appendChild(gh);
+          continue;
+        }
+        var idx = inst.optionEls.length;
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "hjsel-opt";
+        b.id = inst.popId + "-opt-" + idx;
+        b.setAttribute("role", "option");
+        b.dataset.value = o.value;
+        b.disabled = !!o.disabled;
+        b.innerHTML = '<span class="hjsel-opt-t"></span><span class="hjsel-check">' + checkSvg() + '</span>';
+        b.firstChild.textContent = o.label;
+        (function (ii) {
+          b.addEventListener("mousemove", function () { setActive(inst, ii); });
+          b.addEventListener("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            pick(inst, inst.values[ii]);
+          });
+        })(idx);
+        pop.appendChild(b);
+        inst.optionEls.push(b);
+        inst.values.push(o.value);
+      }
+      markOn(inst);
+    }
+    function setActive(inst, idx) {
+      if (!inst.optionEls.length) return;
+      if (idx < 0) idx = 0;
+      if (idx >= inst.optionEls.length) idx = inst.optionEls.length - 1;
+      inst.active = idx;
+      for (var i = 0; i < inst.optionEls.length; i++) {
+        inst.optionEls[i].classList.toggle("active", i === idx);
+      }
+      var el = inst.optionEls[idx];
+      inst.btn.setAttribute("aria-activedescendant", el.id);
+      var pr = inst.pop.getBoundingClientRect(), r = el.getBoundingClientRect();
+      if (r.top < pr.top) inst.pop.scrollTop -= (pr.top - r.top) + 6;
+      else if (r.bottom > pr.bottom) inst.pop.scrollTop += (r.bottom - pr.bottom) + 6;
+    }
+    function position(inst) {
+      var r = inst.btn.getBoundingClientRect();
+      var pop = inst.pop;
+      pop.style.minWidth = Math.max(170, r.width) + "px";
+      var w = pop.offsetWidth, h = pop.offsetHeight;
+      var left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+      var top = r.bottom + 6;
+      if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+      pop.style.left = Math.round(left) + "px";
+      pop.style.top = Math.round(top) + "px";
+    }
+    function onDocDown(e) {
+      if (!openInst) return;
+      if (openInst.wrap.contains(e.target) || openInst.pop.contains(e.target)) return;
+      close(openInst, false);
+    }
+    function onWinChange(e) {
+      // 弹层自身滚动（键盘导航 scrollIntoView）不应触发关闭
+      if (e && e.target && openInst && openInst.pop.contains(e.target)) return;
+      if (openInst) close(openInst, false);
+    }
+    function open(inst) {
+      if (openInst && openInst !== inst) close(openInst, false);
+      build(inst);
+      inst.open = true;
+      openInst = inst;
+      inst.wrap.classList.add("open");
+      inst.btn.setAttribute("aria-expanded", "true");
+      inst.pop.setAttribute("aria-hidden", "false");
+      position(inst);
+      inst.pop.classList.add("show");
+      var selIdx = -1;
+      for (var i = 0; i < inst.values.length; i++) {
+        if (inst.values[i] === inst.sel.value) { selIdx = i; break; }
+      }
+      setActive(inst, selIdx < 0 ? 0 : selIdx);
+      document.addEventListener("mousedown", onDocDown, true);
+      window.addEventListener("resize", onWinChange);
+      window.addEventListener("scroll", onWinChange, true);
+    }
+    function close(inst, focusBack) {
+      if (!inst || !inst.open) return;
+      inst.open = false;
+      if (openInst === inst) openInst = null;
+      inst.wrap.classList.remove("open");
+      inst.btn.setAttribute("aria-expanded", "false");
+      inst.pop.classList.remove("show");
+      inst.pop.setAttribute("aria-hidden", "true");
+      document.removeEventListener("mousedown", onDocDown, true);
+      window.removeEventListener("resize", onWinChange);
+      window.removeEventListener("scroll", onWinChange, true);
+      if (focusBack) { try { inst.btn.focus({ preventScroll: true }); } catch (e) { try { inst.btn.focus(); } catch (e2) {} } }
+    }
+    function pick(inst, value) {
+      if (inst.sel.value !== value) {
+        inst.sel.value = value;
+        try { inst.sel.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) {}
+        try { inst.sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (e) {}
+      }
+      sync(inst.sel);
+      close(inst, true);
+    }
+    function onKey(e) {
+      var inst = this.__hjsel;
+      if (!inst) return;
+      var k = e.key;
+      if (k === "ArrowDown" || k === "ArrowUp") {
+        e.preventDefault();
+        if (!inst.open) open(inst);
+        else setActive(inst, inst.active + (k === "ArrowDown" ? 1 : -1));
+      } else if (k === "Home" || k === "End") {
+        if (!inst.open) return;
+        e.preventDefault();
+        setActive(inst, k === "Home" ? 0 : inst.optionEls.length - 1);
+      } else if (k === "Enter" || k === " ") {
+        e.preventDefault();
+        if (!inst.open) open(inst);
+        else if (inst.active >= 0) pick(inst, inst.values[inst.active]);
+      } else if (k === "Escape") {
+        if (inst.open) { e.preventDefault(); close(inst, true); }
+      } else if (k === "Tab") {
+        if (inst.open) close(inst, false);
+      }
+    }
+    function create(sel) {
+      if (sel.__hjsel) return sel.__hjsel;
+      var label = sel.closest ? sel.closest("label") : null;
+      var useLabel = !!(label && label.getAttribute("for") === sel.id);
+      var host = useLabel ? label : sel.parentNode;
+      if (!host) return null;
+      var caption = useLabel ? labelText(host) : "";
+      if (useLabel) host.removeAttribute("for");
+      host.classList.add("hjsel-wrap");
+      sel.classList.add("hjsel-native");
+      sel.setAttribute("tabindex", "-1");
+      sel.setAttribute("aria-hidden", "true");
+
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "hjsel-btn";
+      btn.setAttribute("role", "combobox");
+      btn.setAttribute("aria-haspopup", "listbox");
+      btn.setAttribute("aria-expanded", "false");
+      btn.innerHTML = '<span class="hjsel-val"></span><span class="hjsel-chev">' + chevSvg() + '</span>';
+      host.appendChild(btn);
+
+      var pop = document.createElement("div");
+      pop.className = "hjsel-pop";
+      pop.id = "hjselPop" + (++seq);
+      pop.setAttribute("role", "listbox");
+      pop.setAttribute("aria-hidden", "true");
+      document.body.appendChild(pop);
+
+      var inst = {
+        sel: sel, wrap: host, btn: btn, pop: pop, valEl: btn.firstChild,
+        popId: pop.id, open: false, active: -1, optionEls: null, values: null, caption: caption
+      };
+      sel.__hjsel = inst;
+      btn.__hjsel = inst;
+      // 其他代码路径（含程序化赋值后手动派发的事件）也要同步按钮文案
+      sel.addEventListener("input", function () { sync(sel); });
+      sel.addEventListener("change", function () { sync(sel); });
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (inst.open) close(inst, true); else open(inst);
+      });
+      btn.addEventListener("keydown", onKey);
+      if (useLabel) {
+        host.addEventListener("click", function (e) {
+          if (e.target === btn || btn.contains(e.target)) return;
+          e.preventDefault();
+          btn.click();
+        });
+      }
+      sync(sel);
+      return inst;
+    }
+    function init() {
+      if (!isDesktop()) return;
+      var list = document.querySelectorAll("select[data-hjsel]");
+      for (var i = 0; i < list.length; i++) create(list[i]);
+    }
+    return { init: init, sync: sync, create: create };
+  })();
+
+  /* =========================================================
+     桌面确认对话框 —— 替代 Windows 原生 confirm
+     与 hjConfirm() 的 Promise 接口一致；移动端仍由 layers.js 提供 Material 版。
+     ========================================================= */
+  var HJDesktopDialog = (function () {
+    function isDesktop() {
+      try {
+        if (document.documentElement.classList.contains("m-mobile")) return false;
+        return !(window.matchMedia && window.matchMedia("(max-width:760px)").matches);
+      } catch (e) { return true; }
+    }
+    function icon(name) {
+      return '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' + name + '"/></svg>';
+    }
+    function confirm(opts) {
+      opts = opts || {};
+      if (!isDesktop()) {
+        var text = opts.native || opts.message || opts.title || "";
+        return Promise.resolve(window.confirm(text));
+      }
+      return new Promise(function (resolve) {
+        var done = false;
+        var danger = !!opts.danger;
+        var ov = document.createElement("div");
+        ov.className = "overlay hjdlg-overlay";
+        ov.innerHTML =
+          '<div class="modal hjdlg" role="alertdialog" aria-modal="true">' +
+            '<div class="mhead">' +
+              '<span class="mhead-ico ' + (danger ? "danger" : "ok") + '">' + icon(danger ? "triangle" : "check") + '</span>' +
+              '<h2></h2>' +
+              '<button class="dlg-close hjdlg-x" type="button" aria-label="关闭">' + icon("x") + '</button>' +
+            '</div>' +
+            '<div class="mbody"><p class="hjdlg-m"></p></div>' +
+            '<div class="mfoot"><span class="grow"></span>' +
+              '<button class="ghost hjdlg-cancel" type="button"></button>' +
+              '<button class="primary hjdlg-ok' + (danger ? " danger" : "") + '" type="button"></button>' +
+            '</div>' +
+          '</div>';
+        var box = ov.firstChild;
+        var title = ov.querySelector("h2");
+        var msg = ov.querySelector(".hjdlg-m");
+        var x = ov.querySelector(".hjdlg-x");
+        var cancel = ov.querySelector(".hjdlg-cancel");
+        var ok = ov.querySelector(".hjdlg-ok");
+        title.textContent = opts.title || "确认操作";
+        msg.textContent = opts.message || "";
+        if (!opts.message) msg.style.display = "none";
+        cancel.textContent = opts.cancelText || "取消";
+        ok.textContent = opts.okText || "确定";
+        box.setAttribute("aria-labelledby", "hjdlgT" + Date.now());
+        title.id = box.getAttribute("aria-labelledby");
+        document.body.appendChild(ov);
+
+        function finish(v) {
+          if (done) return;
+          done = true;
+          document.removeEventListener("keydown", onKey, true);
+          ov.classList.remove("show");
+          ov.classList.add("hjdlg-out");
+          setTimeout(function () { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 220);
+          resolve(!!v);
+        }
+        function focusables() { return [x, cancel, ok]; }
+        function onKey(e) {
+          if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); return; }
+          if (e.key !== "Tab") return;
+          var f = focusables();
+          var i = f.indexOf(document.activeElement);
+          if (i < 0) { e.preventDefault(); (e.shiftKey ? f[f.length - 1] : f[0]).focus(); return; }
+          var next = e.shiftKey ? (i - 1 + f.length) % f.length : (i + 1) % f.length;
+          e.preventDefault();
+          f[next].focus();
+        }
+        x.onclick = function () { finish(false); };
+        cancel.onclick = function () { finish(false); };
+        ok.onclick = function () { finish(true); };
+        ov.addEventListener("click", function (e) { if (e.target === ov) finish(false); });
+        document.addEventListener("keydown", onKey, true);
+        requestAnimationFrame(function () { ov.classList.add("show"); });
+        setTimeout(function () { try { cancel.focus(); } catch (e) {} }, 40);
+        // 兜底：rAF 被节流（headless/低性能）时 .show 晚到，40ms 那次 focus 会落在 display:none 上
+        setTimeout(function () {
+          if (!ov.contains(document.activeElement)) { try { cancel.focus(); } catch (e) {} }
+        }, 220);
+      });
+    }
+    function toast(msg, opts) {
+      if (window.HJ && window.HJ.toast) { try { window.HJ.toast(msg, (opts && opts.kind) || "ok"); return; } catch (e) {} }
+      console.log("[toast] " + msg);
+    }
+    return { confirm: confirm, toast: toast, isDesktop: isDesktop };
+  })();
+
+  /* ---- 轻量动效工具（beUI Input 的 error shake 等） ---- */
+  var HJFX = window.HJFX = {
+    shake: function (elm) {
+      if (!elm) return;
+      elm.classList.remove("hj-shake");
+      void elm.offsetWidth;
+      elm.classList.add("hj-shake");
+      elm.addEventListener("animationend", function h() {
+        elm.classList.remove("hj-shake");
+        elm.removeEventListener("animationend", h);
+      });
+    },
+    /* 数字滚动（beUI Number Animation）：数值变化时从上次显示值滚到新值。
+       用 ease-out 而不是弹簧——计数途中不该出现超过真实值的过冲假数字。
+       fmt 把数值渲染成文本（默认整数十进制）；首次出现直接落值不滚。
+       状态记在元素（_hjCount）上，跨重渲染续接。 */
+    count: function (el, to, fmt) {
+      if (!el) return;
+      fmt = fmt || function (v) { return String(Math.round(v)); };
+      var reduce = false;
+      try { reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+      var from = typeof el._hjCount === "number" ? el._hjCount : to;
+      el._hjCount = to;
+      if (el._hjCountRaf) { cancelAnimationFrame(el._hjCountRaf); el._hjCountRaf = 0; }
+      if (reduce || from === to) { el.textContent = fmt(to); return; }
+      var t0 = performance.now(), DUR = 480;
+      (function frame(now) {
+        var p = Math.min(1, (now - t0) / DUR);
+        var e = 1 - Math.pow(1 - p, 3);   // easeOutCubic
+        el.textContent = fmt(from + (to - from) * e);
+        if (p < 1) el._hjCountRaf = requestAnimationFrame(frame);
+        else el._hjCountRaf = 0;
+      })(performance.now());
+    }
+  };
+
+  /* =========================================================
      八、初始化
      ========================================================= */
   function init() {
     loadLayout();
     applyLayout();
+    HJSelect.init();
+    // 桌面确认框：与 solver.js 的 hjConfirm() 接口一致；手机端由 layers.js 覆盖
+    if (!window.HJDialog && HJDesktopDialog.isDesktop()) {
+      window.HJDialog = { confirm: HJDesktopDialog.confirm, toast: HJDesktopDialog.toast };
+    }
 
     var sL = $("splitL"), sR = $("splitR");
     if (sL) sL.addEventListener("mousedown", function (e) { startDrag("left", e); });
@@ -1711,13 +2557,19 @@
 
     // 对象分类过滤
     var seg = $("objSeg");
-    if (seg) seg.addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-k]");
-      if (!b) return;
-      OBJ.filter = b.dataset.k;
-      Array.prototype.forEach.call(seg.children, function (x) { x.classList.toggle("on", x === b); });
-      renderObjects();
-    });
+    if (seg) {
+      // beUI Shared Layout Background：选中胶囊 + 悬停胶囊（触屏无 hover 自然不出现）
+      window.HJTabs && window.HJTabs.hover(seg);
+      window.HJTabs && window.HJTabs.sync(seg, false);
+      seg.addEventListener("click", function (e) {
+        var b = e.target.closest("button[data-k]");
+        if (!b) return;
+        OBJ.filter = b.dataset.k;
+        Array.prototype.forEach.call(seg.children, function (x) { x.classList.toggle("on", x === b); });
+        window.HJTabs && window.HJTabs.sync(seg, true);
+        renderObjects();
+      });
+    }
 
     // 步骤条
     var bar = $("stepbar");
@@ -1781,7 +2633,12 @@
       } catch (e) {}
       try { if (window.board && window.board.update) window.board.update(); } catch (e) {}
     };
-    window.addEventListener("resize", function () { applyLayout(); if (HJ._onResize) HJ._onResize(); });
+    window.addEventListener("resize", function () {
+      applyLayout();
+      if (HJ._onResize) HJ._onResize();
+      // 浮层换档/横竖屏后画布可见带子变了：等布局稳定再按可见区域取景
+      scheduleFitVisible(120);
+    });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

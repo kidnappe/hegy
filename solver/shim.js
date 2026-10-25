@@ -24,6 +24,11 @@
   // 建画板：GGBBoard.init('ggb-canvas', {...}) → JSXGraph 实例
   window.GGBBoard = {
     init: function (id, opts) {
+      // 手机不显示 JSXGraph 自带的导航条（- o + / 方向箭头），
+      // 双指缩放/拖动和工具栏已经覆盖；桌面保留。
+      var mobile = document.documentElement.classList.contains("m-mobile") ||
+        (window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
+      if (mobile) opts = Object.assign({}, opts || {}, { showNavigation: false });
       return JXG.JSXGraph.initBoard(id, opts);
     }
   };

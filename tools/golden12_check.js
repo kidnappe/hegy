@@ -1,5 +1,5 @@
 // Golden 12 离线硬断言：只读 .tmp/golden12_results.json，不重跑模型。
-// 用法：node tools\golden12_check.js
+// 用法：node .tmp\golden12_check.js
 const fs = require('fs');
 const path = require('path');
 

@@ -1,0 +1,14 @@
+{
+  "appId": "com.hejie.solver",
+  "appName": "何解",
+  "webDir": "www",
+  "backgroundColor": "#f4f5f7",
+  "android": {
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": false
+    }
+  }
+}

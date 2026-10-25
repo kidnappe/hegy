@@ -18,7 +18,7 @@
 - [ ] `npm test` 通过
 - [ ] 涉及 UI / 渲染：附截图或录屏
 - [ ] 涉及导出：验证了 2D / 3D、桌面 / 手机宽度
-- [ ] 涉及 `/api/*`：同步检查了 `serve.js` 与前端调用方
+- [ ] 涉及 `/api/*`：同步检查了 `serve.js`、`localapi.js`、`mobile/ARCH.md`
 - [ ] 涉及提示词：同步更新了 `prompt-rules.md`
 
 ## 影响范围
@@ -30,7 +30,6 @@
 - [ ] 没有提交 API Key、用户记录、构建产物或大体积素材
 - [ ] 一个 PR 只做一件事
 - [ ] 新增 / 修改的代码符合现有风格（原生 JS、IIFE、2 空格）
-- [ ] 如引入第三方代码 / 字体 / 素材，已更新 `solver/vendor/LICENSES.md`
 
 ## 关联 Issue
 

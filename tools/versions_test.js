@@ -9,8 +9,8 @@ const EDGE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
 const PORT = 9415;
 const APP = "http://127.0.0.1:8099/solver/index.html";
 const API = "http://127.0.0.1:8099";
-const TEST_DIR = path.join(os.tmpdir(), "hegy-version-test");
-const DL_DIR = path.join(os.tmpdir(), "hegy-version-dl");
+const TEST_DIR = "D:\\software\\tmp\\opencode\\hegy-version-test";
+const DL_DIR = "D:\\software\\tmp\\opencode\\hegy-version-dl";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let fails = 0;
 const ok = (n, c, x) => { if (c) console.log("  ok   " + n + (x ? "  [" + x + "]" : "")); else { console.log("  FAIL " + n + (x ? "  [" + x + "]" : "")); fails++; } };

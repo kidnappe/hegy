@@ -932,9 +932,14 @@
     LS = Math.max(size * 0.05, 1e-6);
 
     var W = container.clientWidth || 800, H = container.clientHeight || 600;
-    st.gridMesh = null;
+    st.gridMesh = null; st.gridSpan = null;
     var renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(window.devicePixelRatio || 1); renderer.setSize(W, H); renderer.setClearColor(0xffffff, 1);
+    // 手机上 3x DPR 的整屏 WebGL 纹理很吃 GPU/显存，封到 2x 肉眼看不出差别
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(W, H);
+    // 背景走皮肤 palette（导出离线 HTML 没有 skins.js → 回退原值 0xffffff，行为不变）
+    var PAL3D = (window.HJSkin && HJSkin.palette()) || null;
+    renderer.setClearColor(PAL3D && PAL3D.paper3d != null ? PAL3D.paper3d : 0xffffff, 1);
     container.innerHTML = ""; container.appendChild(renderer.domElement);
     st.renderer = renderer;
 
@@ -997,7 +1002,7 @@
     api.refresh();
     st.api = api;
 
-    // 取景：坐标轴长 1.1×跨度、字母还要再外移，必须都装得下。
+    // 取景（HANDOVER §71 / U-11 / §72）：坐标轴长 1.1×跨度、字母还要再外移，必须都装得下。
     // 但原来的写法有两个毛病：① 用「包围球 / sin(半视角)」，球的半径是盒子的 √3 倍，白白把相机推远；
     // ② 只「装不下才后退」，模型随手写个大 distance 就一直是小图（§72：图形只占画布 1/5）。
     // 现在改成：把包围盒 8 个角点投到相机平面，按横/纵半视角分别算距离取最大值；太远也拉近。
@@ -1027,13 +1032,17 @@
       }
     } catch (e) {}
 
-    // 建系题自动铺坐标纸：只在 xOy 底面画一层、每 1 单位一格、不标数字。
+    // 建系题自动铺坐标纸（HANDOVER §72）：只在 xOy 底面画一层、每 1 单位一格、不标数字。
     // 默认开，模型可写 "axes":{"grid":false} 关掉。放在取景之后，避免网格把相机推远、图形变小。
     if (axShow && axCfg && typeof axCfg === "object" && axCfg.grid !== false) {
       try {
         var gSpan = Math.max(2, Math.ceil(Math.max(sizeV.x, sizeV.y, 1) + 2));
         if (gSpan % 2) gSpan += 1;                       // 偶数格，保证线落在整数坐标上
-        var gridMesh = new THREE.GridHelper(gSpan, gSpan, 0xd0d0d0, 0xe8e8e8);
+        var gPal = (window.HJSkin && HJSkin.palette()) || null;
+        var gridMesh = new THREE.GridHelper(gSpan, gSpan,
+          gPal && gPal.gridMajor3d != null ? gPal.gridMajor3d : 0xd0d0d0,
+          gPal && gPal.gridMinor3d != null ? gPal.gridMinor3d : 0xe8e8e8);
+        st.gridSpan = gSpan;                              // 皮肤切换时重建网格用
         gridMesh.rotation.x = Math.PI / 2;              // 默认在 XZ 平面，转到 xOy
         // 居中点取「整数 + 半跨度」，这样每条网格线都恰好落在整数坐标上（否则会误导读坐标）
         var gx = Math.round(center.x - gSpan / 2) + gSpan / 2;
@@ -1071,26 +1080,44 @@
       hoverId = id;
       if (window.HJ && window.HJ.hoverObject) window.HJ.hoverObject(id == null ? null : String(id));
     }
-    renderer.domElement.addEventListener("pointermove", function (ev) {
+    function pickAt(clientX, clientY) {
       var rect = renderer.domElement.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      pickPtr.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-      pickPtr.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      if (!rect.width || !rect.height) return null;
+      pickPtr.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      pickPtr.y = -((clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pickPtr, cam);
       var hits = raycaster.intersectObjects(pickables, true);
-      var id = null;
       for (var i = 0; i < hits.length; i++) {
         var p = hits[i].object;
         while (p && p.userData.__hjItemId == null) p = p.parent;
         if (!p) continue;
         var it = api.byId[String(p.userData.__hjItemId)];
         if (!it || it.vis === false) continue;
-        id = it.id;
-        break;
+        return it.id;
       }
-      setHoverId(id);
+      return null;
+    }
+    renderer.domElement.addEventListener("pointermove", function (ev) {
+      if (ev.pointerType === "touch") return;
+      setHoverId(pickAt(ev.clientX, ev.clientY));
     });
     renderer.domElement.addEventListener("pointerleave", function () { setHoverId(null); });
+    // 点选（手机）：拖动旋转/缩放不算；短按且命中对象才通知外壳
+    var tap0 = null;
+    renderer.domElement.addEventListener("pointerdown", function (ev) {
+      if (ev.pointerType === "touch") setHoverId(null);
+      tap0 = { x: ev.clientX, y: ev.clientY };
+    });
+    renderer.domElement.addEventListener("pointerup", function (ev) {
+      if (!tap0) return;
+      var d = Math.abs(ev.clientX - tap0.x) + Math.abs(ev.clientY - tap0.y);
+      tap0 = null;
+      if (d > 10) return;
+      var id = pickAt(ev.clientX, ev.clientY);
+      if (id != null && window.HJMobile && window.HJMobile.onCanvasObject) {
+        window.HJMobile.onCanvasObject(String(id));
+      }
+    });
 
     // 3D 的步骤/滑块/多图切换改由 ui.js 统一渲染（不再自建浮层）
     if (!window.HJ || !window.HJ.afterRender3D) buildUI(container, api, scene);
@@ -1101,6 +1128,9 @@
     st.t = 0;
     (function loop(now) {
       st.raf = requestAnimationFrame(loop);
+      // 拖动浮层时不渲染：画布正在被合成层移动，且大部分被盖住；
+      // 和排版抢同一帧只会放大掉帧。松手后下一帧自动恢复。
+      if (document.hidden || (document.body && document.body.classList.contains("m-sheet-dragging"))) return;
       if (st.tween) {
         var k = Math.min(1, (performance.now() - st.tween.t0) / st.tween.dur);
         var e = k < 0.5 ? 2 * k * k : -1 + (4 - 2 * k) * k;
@@ -1132,7 +1162,7 @@
       if (s.title && s.payload.title == null) s.payload.title = s.title;
       return s.payload;
     }) : null;
-    // 兜底：模型常把主图放顶层、附加图放 questionScenes，
+    // 兜底（HANDOVER §70）：模型常把主图放顶层、附加图放 questionScenes，
     // 而这里原来「有图集就只认图集」会把顶层整张丢掉。顶层有图且与图集首张不同，就并成第一张。
     if (qs) {
       var baseHasFig = (st.base.points && st.base.points.length) || (st.base.paths && st.base.paths.length);
@@ -1178,9 +1208,34 @@
     st.renderer.setSize(w, h);
   }
 
+  // 皮肤切换：换背景色 + 重建网格（GridHelper 的颜色烘在顶点色里，改不了只能重建）。
+  // 只动背景/网格，不重建几何（SKIN-SYSTEM.md §5.3）。无 skins.js 时调用不到（存在性判断在 solver.js）。
+  function applyPalette(pal) {
+    if (!st.renderer || !st.scene) return;
+    var p = pal || {};
+    try { st.renderer.setClearColor(p.paper3d != null ? p.paper3d : 0xffffff, 1); } catch (e) {}
+    if (st.gridMesh && st.gridSpan) {
+      var vis = st.gridMesh.visible, pos = st.gridMesh.position.clone(), rot = st.gridMesh.rotation.x;
+      var op = st.gridMesh.material.opacity, tr = st.gridMesh.material.transparent;
+      st.scene.remove(st.gridMesh);
+      try { st.gridMesh.geometry.dispose(); st.gridMesh.material.dispose(); } catch (e2) {}
+      st.gridMesh = new THREE.GridHelper(st.gridSpan, st.gridSpan,
+        p.gridMajor3d != null ? p.gridMajor3d : 0xd0d0d0,
+        p.gridMinor3d != null ? p.gridMinor3d : 0xe8e8e8);
+      st.gridMesh.rotation.x = rot;
+      st.gridMesh.position.copy(pos);
+      st.gridMesh.material.transparent = tr;
+      st.gridMesh.material.opacity = op;
+      st.gridMesh.visible = vis;
+      st.scene.add(st.gridMesh);
+    }
+    // 阻尼控制的渲染循环本来就在跑；这里再推一帧保证立即生效
+    try { if (st.scene && st.camera) st.renderer.render(st.scene, st.camera); } catch (e3) {}
+  }
+
   window.GGB3D = {
     render: render, dispose: dispose, focus: focus, snapshot: snapshot, focusOn: focusOn,
-    getApi: getApi, getScene: getScene, resetView: resetView, resize: resize,
+    getApi: getApi, getScene: getScene, resetView: resetView, resize: resize, applyPalette: applyPalette,
     setGrid: function (v) { st.gridOn = !!v; if (st.gridMesh) st.gridMesh.visible = !!v; },
     hasGrid: function () { return !!st.gridMesh; },
     gridVisible: function () { return !!(st.gridMesh && st.gridMesh.visible); },

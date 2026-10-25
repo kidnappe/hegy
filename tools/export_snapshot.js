@@ -1,4 +1,4 @@
-// 用真实应用链路导出离线 HTML（2D + 3D），供移动端呈现对比
+﻿// 用真实应用链路导出离线 HTML（2D + 3D），供移动端呈现对比
 // 用法: node export_snapshot.js <tag>
 const fs = require("fs");
 const path = require("path");

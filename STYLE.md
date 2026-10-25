@@ -2,7 +2,7 @@
 
 > 本文回答三件事：**这个应用能做什么**、**它现在长什么样**、**视觉资产（应用图标 / 启动图）的现状与约束**。
 > 适用范围：`solver/`（应用本体）、`desktop/`（Electron 外壳与打包）。
-> 以 `1.1.0` 已提交代码为准；最后核对：2026-10-24。若代码与本文冲突，以代码为准。
+> 以 `1.2.0` 已提交代码为准；最后核对：2026-10-25。若代码与本文冲突，以代码为准。
 
 ---
 
@@ -12,7 +12,7 @@
 
 - 形态：Windows 便携版单 exe（Electron），也可用浏览器直接跑。
 - 数据：模型配置在 `%USERPROFILE%\.hegy\settings.json`，解题记录在 `文档\Hegy\records\`，错误日志在 `%USERPROFILE%\.hegy\logs\errors.jsonl`；便携版另把 Electron 自身的 `localStorage` 等用户数据放在 exe 同目录 `HegyData\`。
-- 版本：`1.1.0`（首个公开版本）。
+- 版本：`1.2.0`（首个公开版本）。
 - 包名 / appId：`hegy` / `com.hegy.app`。
 
 ---
@@ -401,7 +401,7 @@ $img.Dispose()
 | 项 | 值 |
 |---|---|
 | 产品名 / 英文名 | 何解 / Hegy |
-| 版本 | `1.1.0`（首个公开版本） |
+| 版本 | `1.2.0`（首个公开版本） |
 | 主色 | 日间 `#5b5bd6` / 夜间 `#8f8ff5` |
 | 基准字号 | 13px |
 | 顶栏 / 状态栏 | 52px / 28px |
@@ -411,7 +411,7 @@ $img.Dispose()
 | 应用图标 | 1024×1024 PNG 母版 + 7 档 ICO（16–256） |
 | 网页图标 | 16 / 32 / 64 / 256 PNG |
 | 启动图 | 560×340 / 24bpp / 96 DPI；2x 源图 1120×680 |
-| 便携包体积 | x64 ≈ 95MB（1.1.0，Electron 26 实测；升级 Electron 45 后需重新测量） |
+| 便携包体积 | x64 ≈ 95MB（1.2.0，Electron 26.6.10 实测） |
 | 启动耗时（本机） | Electron 26 实测：解压 5–6s；到应用可用约 7–8s（升级后需重测） |
 | 数据目录 | `~/.hegy/settings.json`、`文档\Hegy\records\`、`~/.hegy/logs/errors.jsonl` |
 | 界面偏好 | `solver_theme_v1` / `solver_layout_v1` / `solver_grid_v1` |

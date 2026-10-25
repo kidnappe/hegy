@@ -1,7 +1,7 @@
 // 2D 独立 harness：加载 jsxgraph + geometry + shim 后直接跑 renderCode 并截图
 // 用法：node tools\shot_2d_harness.js           （复用 .tmp/space2d_code.js）
 //       node tools\shot_2d_harness.js --solve   （重新调模型生成一份）
-// 依赖顺序很关键：jsxgraph.js → geometry.js → shim.js，容器 id 必须是 ggb-canvas
+// 依赖顺序很关键：jsxgraph.js → geometry.js → shim.js，容器 id 必须是 ggb-canvas（见 HANDOVER §71.9）
 const fs=require('fs'),os=require('os'),path=require('path'),{spawn,execSync}=require('child_process');
 const ROOT=path.join(__dirname,'..'),TMP=path.join(ROOT,'.tmp'),SERVE=path.join(ROOT,'solver','serve.js'),PORT=8144,BASE='http://127.0.0.1:'+PORT;
 const EDGE='C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';

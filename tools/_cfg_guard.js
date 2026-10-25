@@ -1,4 +1,4 @@
-// 真实配置保护：跑前备份 ~/.hegy/settings.json，退出或异常一律恢复。
+// 真实配置保护（HANDOVER §71 / U-17）：跑前备份 ~/.hegy/settings.json，退出或异常一律恢复。
 // 用法一（推荐）：node tools\run_with_cfg_guard.js tools\versions_test.js
 // 用法二（脚本内）：const guard = require("./_cfg_guard"); guard.install();
 const fs = require("fs");

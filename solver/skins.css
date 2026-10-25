@@ -1,0 +1,432 @@
+/* =========================================================
+   何解 · 皮肤层（skins.css）
+   ---------------------------------------------------------
+   规则（见 SKIN-SYSTEM.md）：
+   - 本文件只定义 token 和少量结构开关，不写组件布局；
+   - 组件（ui.css）只引用语义变量，不写死色值；
+   - 三套皮肤共用 primary #5b5bd6；--ok/--warn/--danger 是功能色，
+     任何皮肤都不得把它们改成品牌紫以外的语义（可微调明度）。
+   - 加载顺序：ui.css → skins.css。两文件对 html 的选择器特异性相同，
+     后加载的 skins.css 在 warm/swiss 上覆盖默认值；
+     这同时是"未设计组合"（warm/swiss × dark）的 CSS 兜底：
+     即使被塞进 data-theme="dark"，warm/swiss 的日间 token 仍然最后生效。
+   - default 皮肤不覆盖任何既有变量（那些值仍由 ui.css :root 与
+     html[data-theme="dark"] 提供），只补充新 token——保证默认皮肤逐像素一致。
+   ========================================================= */
+
+/* Warm 衬线（拍板：方案 A 子集 WOFF2）：只嵌界面固定标题/答案文案
+   （字表见 tools 生成脚本），动态文本（步骤标题等）回退系统宋体，同为衬线不跳风格。
+   字体文件 solver/fonts/NotoSerifSC-{400,700}.woff2（各 ~52KB，OFL 许可）。 */
+@font-face{
+  font-family:"Noto Serif SC Sub";
+  src:url("fonts/NotoSerifSC-400.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap;
+}
+@font-face{
+  font-family:"Noto Serif SC Sub";
+  src:url("fonts/NotoSerifSC-700.woff2") format("woff2");
+  font-weight:700;font-style:normal;font-display:swap;
+}
+
+/* ============ 新 token · default（取值 = 现有界面的实际值） ============ */
+html[data-skin="default"]{
+  /* 字体：默认 = 现状（系统 sans；公式由 KaTeX 自带字体，不随皮肤） */
+  --font-heading:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  --font-heading-weight:600;
+  --font-question:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  --font-data:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  --font-label:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  --font-math:KaTeX_Main,"Times New Roman",serif;
+
+  /* 分隔 / 边框 / 圆角 / 阴影（现值：按钮 8px、卡片 10px、浮层 14px、浮条阴影=--shadow） */
+  --line-strong:#e4e7ec;
+  --frame:var(--bg);
+  --border-strong:1px;
+  --radius-control:8px;
+  --radius-card:10px;
+  --radius-overlay:14px;
+  --shadow-overlay:0 2px 8px rgba(20,24,32,.06);
+
+  /* 状态栏 / 步骤条：现状 = 面板色 / 玻璃浮条（用 var 引用，夜间自动跟随） */
+  --status-bg:var(--panel);
+  --status-text:var(--txt-3);
+  --stepbar-bg:var(--glass);
+  --stepbar-text:var(--txt);
+
+  /* 画布（JS palette 的 CSS 镜像；真正上色走 skins.js 的 palette，见 SKIN-SYSTEM.md §5.3）。
+     现值来源：solver.js ensureGrid2D 的网格 #e2e2e2；JSXGraph 默认轴/标注为参考值。
+     default 皮肤在 JS 侧不动轴色（axis:null），网格 #e2e2e2 与现状一致。 */
+  --canvas-grid:#e2e2e2;
+  --canvas-axis:#c9ced6;
+  --canvas-label:#98a0aa;
+  --canvas-line:#1c2024;
+  --canvas-median:#5b5bd6;
+  --canvas-area:rgba(91,91,214,.055);
+
+  /* 对象列表色点的基础值下沉到 ui.css :root（组件兜底）；皮肤层只做覆盖 */
+
+  --focus-ring:2px solid var(--accent-3);
+  --icon-stroke:2;
+}
+
+/* ============ 03 暖工业（warm）· 日间 ============ */
+html[data-skin="warm"]{
+  /* 既有变量覆盖（SKIN-SYSTEM.md §4.2 色板） */
+  --bg:#ece5d9;
+  --panel:#ece5d9;
+  --panel-2:#f6f0e5;
+  --paper:#fbf7ef;
+  --glass:rgba(246,240,229,.97);
+  --hover:#e3dbcc;
+  --hover-2:#dbd2c1;
+  --txt:#1b1a17;
+  --txt-2:#4b473f;
+  --txt-3:#6b6356;   /* QA 对比度实测：§4.2 原值 #857e72 仅 3.5:1，加深到 panel 上 ~4.9:1 */
+  --txt-body:#35322c;
+  --line:#a89f91;
+  --line-2:#cec5b8;
+  --accent:#5b5bd6;
+  --accent-h:#4a4ac4;
+  --accent-2:#e9e6f5;
+  --accent-3:#7c7cf0;
+  --hi-a:#f3f1f9;
+  --hi-b:#e4e4f8;
+  --shadow:4px 4px 0 rgba(27,25,20,.12);
+  --shadow-lg:0 12px 40px rgba(27,25,20,.24);
+
+  /* 新 token */
+  --font-heading:"Noto Serif SC Sub","Noto Serif SC","STSong","SimSun",serif;   /* 子集 WOFF2 已内嵌（方案 A） */
+  --font-heading-weight:700;
+  --font-question:"Noto Serif SC Sub","Noto Serif SC","STSong","SimSun",serif;
+  --font-data:Consolas,"Cascadia Mono",monospace;
+  --font-label:Consolas,"Cascadia Mono",monospace;
+  --font-math:KaTeX_Main,"Times New Roman",serif;
+  --line-strong:#2a2823;
+  --frame:#d8d0c3;
+  --border-strong:2px;
+  --radius-control:0px;
+  --radius-card:0px;
+  --radius-overlay:0px;
+  --shadow-overlay:4px 4px 0 rgba(27,25,20,.12);
+  --status-bg:#1b1a17;
+  --status-text:#cfc8bb;
+  --stepbar-bg:#f6f0e5;
+  --stepbar-text:#1b1a17;
+  --canvas-grid:#e4ddd0;
+  --canvas-axis:#a99f90;
+  --canvas-label:#857e72;
+  --canvas-line:#1b1a17;
+  --canvas-median:#5b5bd6;
+  --canvas-area:rgba(91,91,214,.055);
+  --object-point:#1b1a17;
+  --object-line:#6f6a5e;
+  --object-angle:#9c5d2e;   /* 赭 */
+  --object-area:#6b7a3f;    /* 橄榄 */
+  --focus-ring:2px solid var(--accent-3);
+  --icon-stroke:1.6;
+}
+
+/* ============ 04 瑞士网格（swiss）· 日间 ============ */
+html[data-skin="swiss"]{
+  --bg:#ffffff;
+  --panel:#ffffff;
+  --panel-2:#f7f7f4;
+  --paper:#ffffff;
+  --glass:#ffffff;
+  --hover:#f2f2ef;
+  --hover-2:#e9e9e4;
+  --txt:#0d0d0d;
+  --txt-2:#3f3f3f;
+  --txt-3:#6b6b65;   /* QA 对比度实测：原 §4.2 的 #8a8a86 在 panel-2 上仅 3.2:1，加深到 5.0:1 */
+  --txt-body:#1a1a1a;
+  --line:#c9c9c2;
+  --line-2:#e6e6e1;
+  --accent:#5b5bd6;
+  --accent-h:#4a4ac4;
+  --accent-2:#f3f3fc;
+  --accent-3:#7c7cf0;
+  --hi-a:#f4f4fd;
+  --hi-b:#e4e4f8;
+  --shadow:none;
+  --shadow-lg:0 12px 40px rgba(13,13,13,.18);
+
+  --font-heading:"Noto Sans SC","Microsoft YaHei",Arial,sans-serif;
+  --font-heading-weight:700;
+  --font-question:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  --font-data:Consolas,"Cascadia Mono",monospace;
+  --font-label:Consolas,"Cascadia Mono",monospace;
+  --font-math:KaTeX_Main,"Times New Roman",serif;
+  --line-strong:#111111;
+  --frame:#f2f2ef;
+  --border-strong:2px;
+  --radius-control:0px;
+  --radius-card:0px;
+  --radius-overlay:0px;
+  --shadow-overlay:none;
+  --status-bg:#111111;
+  --status-text:#ffffff;
+  --stepbar-bg:#111111;
+  --stepbar-text:#ffffff;
+  --canvas-grid:#e8e8e3;
+  --canvas-axis:#b4b4ae;
+  --canvas-label:#8a8a86;
+  --canvas-line:#0d0d0d;
+  --canvas-median:#5b5bd6;
+  --canvas-area:rgba(91,91,214,.055);
+  --object-point:#0d0d0d;   /* 拍板：对象点压黑白 + 类型文字保留 */
+  --object-line:#5a5a56;
+  --object-angle:#0d0d0d;
+  --object-area:#5a5a56;
+  --focus-ring:2px solid var(--accent-3);
+  --icon-stroke:1.6;
+}
+
+/* ============ 03 暖工业 · 夜间（P6 单独设计，非反相） ============
+   设计口径：暖炭色阶（暖棕黑面板 + 暖米色文字），暖灰材质的身份不变；
+   硬分隔线在暗色下提亮为暖浅线；画布仍是白纸 → 网格/轴/纸色沿用日间值；
+   紫色提升沿用 default 夜间的 #8f8ff5（同为紫系，不另起品牌色）。 */
+html[data-skin="warm"][data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#14110d;
+  --panel:#1c1813;
+  --panel-2:#241f18;
+  --glass:rgba(28,24,19,.97);
+  --hover:#2c261e;
+  --hover-2:#352e24;
+  --txt:#ece5d9;
+  --txt-2:#b3a996;
+  --txt-3:#948a76;    /* 实测 5.2:1(panel) / 4.8:1(panel-2) */
+  --txt-body:#d8cdb9;
+  --line:#3d362a;
+  --line-2:#2e2820;
+  --line-strong:#cfc6b4;   /* 暗色下硬分隔提亮为暖浅线 */
+  --accent:#8f8ff5;
+  --accent-h:#a3a3fa;
+  --accent-2:#2e2b45;
+  --accent-3:#9d9df7;
+  --hi-a:#26233a;
+  --hi-b:#3a3654;
+  --shadow:4px 4px 0 rgba(0,0,0,.35);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.5);
+  --shadow-overlay:4px 4px 0 rgba(0,0,0,.35);
+  --status-bg:#14110d;
+  --status-text:#b3a996;
+  --stepbar-bg:#241f18;
+  --stepbar-text:#ece5d9;
+  --frame:#2a251d;
+  --focus-ring:2px solid var(--accent-3);
+  /* 圆角/边框宽度/字体族继承 warm 日间块；画布 token 沿用日间值（白纸） */
+}
+
+/* ============ 04 瑞士网格 · 夜间（P6 单独设计，非反相） ============
+   设计口径：纯灰阶（黑面板 + 米白文字），黑白栅格身份不变；
+   粗黑分隔在暗色下翻为米白规则线；对象点从黑翻为米白（仍压黑白）；
+   画布仍白纸；紫色提升同上。 */
+html[data-skin="swiss"][data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0d0d0d;
+  --panel:#111111;
+  --panel-2:#181816;
+  --glass:#111111;
+  --hover:#1f1f1d;
+  --hover-2:#262624;
+  --txt:#f2f2ef;
+  --txt-2:#b8b8b2;
+  --txt-3:#8a8a86;    /* 实测 5.5:1(panel) / 5.1:1(panel-2) */
+  --txt-body:#d8d8d3;
+  --line:#33332f;
+  --line-2:#242422;
+  --line-strong:#f2f2ef;   /* 暗色下粗分隔翻为米白 */
+  --accent:#8f8ff5;
+  --accent-h:#a3a3fa;
+  --accent-2:#26264a;
+  --accent-3:#9d9df7;
+  --hi-a:#20203a;
+  --hi-b:#33335a;
+  --shadow:none;
+  --shadow-lg:0 12px 40px rgba(0,0,0,.6);
+  --shadow-overlay:none;
+  --status-bg:#0d0d0d;
+  --status-text:#f2f2ef;
+  --stepbar-bg:#0d0d0d;
+  --stepbar-text:#f2f2ef;
+  --frame:#1c1c1a;
+  --object-point:#f2f2ef;  /* 黑白对象点在暗色下翻为米白 */
+  --focus-ring:2px solid var(--accent-3);
+}
+
+/* =========================================================
+   结构开关（少量，仅 warm / swiss；default 完全不碰）
+   原则：只动圆角 / 边框粗细 / 字体族，不动布局与字号档位。
+   圆形元素不在此列：色点、头像、徽标、缩略图删除钮（.x）等保持圆形。
+   ========================================================= */
+
+/* 2D 画布纸底：JSXGraph 的 .jxgbox 自带 background-color:#fff，
+   会盖住 #stage 的 --paper——warm 的奶油纸底必须在这里翻回来。
+   （default 不写这条：jsxgraph 的白 = --paper 的白，行为一致。） */
+html[data-skin="warm"] .jxgbox,
+html[data-skin="swiss"] .jxgbox{
+  background:var(--paper);
+}
+
+/* 粗分隔：主结构线的颜色提到 --line-strong（warm 深炭 / swiss 纯黑）。
+   这是 03/04 两套皮肤的主要识别项——只换线色，不改布局。 */
+html[data-skin="warm"] .topbar,
+html[data-skin="swiss"] .topbar{border-bottom-color:var(--line-strong);}
+html[data-skin="warm"] #inputRow,
+html[data-skin="swiss"] #inputRow{border-bottom-color:var(--line-strong);}
+html[data-skin="warm"] .card,
+html[data-skin="swiss"] .card{border-color:var(--line);}
+html[data-skin="swiss"] .card{border-color:var(--line-strong);}
+
+/* 控件硬边：chip / 顶栏按钮 / 下拉 / 工具条 / 测量卡（§5.1「Warm 硬边；Swiss 方框」） */
+html[data-skin="warm"] .chip,
+html[data-skin="swiss"] .chip,
+html[data-skin="warm"] .tbtn,
+html[data-skin="swiss"] .tbtn,
+html[data-skin="warm"] #gradeWrap,
+html[data-skin="warm"] #dimWrap,
+html[data-skin="warm"] #viewWrap,
+html[data-skin="swiss"] #gradeWrap,
+html[data-skin="swiss"] #dimWrap,
+html[data-skin="swiss"] #viewWrap,
+html[data-skin="warm"] .toolbar,
+html[data-skin="swiss"] .toolbar,
+html[data-skin="warm"] .measure,
+html[data-skin="swiss"] .measure{border-color:var(--line-strong);}
+
+/* swiss 输入框 2px 黑框 + 画布内框（黑线工作台） */
+html[data-skin="swiss"] #q{border-color:var(--line-strong);}
+html[data-skin="swiss"] .acc .field input,
+html[data-skin="swiss"] .acc .field select{border-color:var(--line-strong);}
+html[data-skin="swiss"] #stage{box-shadow:inset 0 0 0 1px var(--line-strong);}
+
+/* 控件方角 */
+html[data-skin="warm"] button:not(.x),
+html[data-skin="swiss"] button:not(.x),
+html[data-skin="warm"] input,
+html[data-skin="swiss"] input,
+html[data-skin="warm"] select,
+html[data-skin="swiss"] select,
+html[data-skin="warm"] textarea,
+html[data-skin="swiss"] textarea{
+  border-radius:var(--radius-control);
+}
+
+/* 卡片 / 弹层方角 */
+html[data-skin="warm"] .card,
+html[data-skin="swiss"] .card,
+html[data-skin="warm"] .msel-pop,
+html[data-skin="swiss"] .msel-pop,
+html[data-skin="warm"] .menu,
+html[data-skin="swiss"] .menu,
+html[data-skin="warm"] .wcard,
+html[data-skin="swiss"] .wcard,
+html[data-skin="warm"] .qfloat,
+html[data-skin="swiss"] .qfloat,
+html[data-skin="warm"] .modal,
+html[data-skin="swiss"] .modal,
+html[data-skin="warm"] .toolbar,
+html[data-skin="swiss"] .toolbar,
+html[data-skin="warm"] .measure,
+html[data-skin="swiss"] .measure,
+html[data-skin="warm"] .stepbar,
+html[data-skin="swiss"] .stepbar,
+html[data-skin="warm"] .toast,
+html[data-skin="swiss"] .toast{
+  border-radius:var(--radius-overlay);
+}
+
+/* 控件边框加粗（输入框 / 主按钮 2px 硬边） */
+html[data-skin="warm"] #q,
+html[data-skin="swiss"] #q,
+html[data-skin="warm"] .acc .field input,
+html[data-skin="swiss"] .acc .field input,
+html[data-skin="warm"] .acc .field select,
+html[data-skin="swiss"] .acc .field select{
+  border-width:var(--border-strong);
+}
+
+/* 标题字体（warm 衬线 / swiss 粗黑 sans）；按钮保持系统 sans，避免控件被衬线传染 */
+html[data-skin="warm"] .brand,
+html[data-skin="warm"] .ph-t,
+html[data-skin="warm"] .acc-t,
+html[data-skin="warm"] .mhead h2,
+html[data-skin="warm"] .wcard h2,
+html[data-skin="warm"] .stepbar .ttl,
+html[data-skin="warm"] .cardh,
+html[data-skin="swiss"] .brand,
+html[data-skin="swiss"] .ph-t,
+html[data-skin="swiss"] .acc-t,
+html[data-skin="swiss"] .mhead h2,
+html[data-skin="swiss"] .wcard h2,
+html[data-skin="swiss"] .stepbar .ttl,
+html[data-skin="swiss"] .cardh{
+  font-family:var(--font-heading);
+  font-weight:var(--font-heading-weight);
+}
+html[data-skin="warm"] button,
+html[data-skin="swiss"] button{
+  font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+}
+/* 题干字体（warm 衬线） */
+html[data-skin="warm"] #q{font-family:var(--font-question);}
+
+/* 状态栏 / 步骤条换底色（warm 深炭、swiss 纯黑） */
+html[data-skin="warm"] .statusbar,
+html[data-skin="swiss"] .statusbar{
+  background:var(--status-bg);
+  border-top:1px solid var(--line-strong);
+  color:var(--status-text);
+}
+html[data-skin="warm"] .statusbar .sb-item.click:hover,
+html[data-skin="swiss"] .statusbar .sb-item.click:hover{
+  background:rgba(255,255,255,.08);
+  color:var(--status-text);
+}
+html[data-skin="warm"] .stepbar,
+html[data-skin="swiss"] .stepbar{
+  background:var(--stepbar-bg);
+  border-color:var(--stepbar-bg);
+  color:var(--stepbar-text);
+  backdrop-filter:none;
+}
+html[data-skin="warm"] .stepbar .idx,
+html[data-skin="warm"] .stepbar .ttl,
+html[data-skin="warm"] .stepbar .nav button,
+html[data-skin="warm"] .stepbar .exp,
+html[data-skin="swiss"] .stepbar .idx,
+html[data-skin="swiss"] .stepbar .ttl,
+html[data-skin="swiss"] .stepbar .nav button,
+html[data-skin="swiss"] .stepbar .exp{
+  color:var(--stepbar-text);
+}
+html[data-skin="warm"] .stepbar .nav button:hover,
+html[data-skin="swiss"] .stepbar .nav button:hover{
+  background:rgba(255,255,255,.10);
+}
+
+/* 欢迎卡贴在画布（--paper）上：warm/swiss 下仍保持浅底、深字，与 default 同逻辑 */
+html[data-skin="warm"] .wcard{background:#fbf7ef;border-color:#a89f91;color:#1b1a17;}
+html[data-skin="warm"] .wcard h2{color:#1b1a17;}
+html[data-skin="warm"] .wcard p{color:#857e72;}
+html[data-skin="warm"] .wacts .g{background:#fbf7ef;border-color:#a89f91;color:#4b473f;}
+html[data-skin="warm"] .wacts .g:hover{background:#f1eadb;color:#1b1a17;}
+html[data-skin="swiss"] .wcard{background:#ffffff;border-color:#111111;color:#0d0d0d;}
+html[data-skin="swiss"] .wcard h2{color:#0d0d0d;}
+html[data-skin="swiss"] .wcard p{color:#8a8a86;}
+html[data-skin="swiss"] .wacts .g{background:#ffffff;border-color:#111111;color:#3f3f3f;}
+html[data-skin="swiss"] .wacts .g:hover{background:#f2f2ef;color:#0d0d0d;}
+
+/* 答案卡：warm 紫左边硬边；swiss 去卡片化 + 紫左线（SKIN-SYSTEM.md §5.1） */
+html[data-skin="warm"] #ansCard{
+  background:var(--panel-2);
+  border:1px solid var(--line-strong);
+  border-left:3px solid var(--accent);
+}
+html[data-skin="swiss"] #ansCard{
+  background:transparent;
+  border:none;
+  border-left:3px solid var(--accent);
+  box-shadow:none;
+}

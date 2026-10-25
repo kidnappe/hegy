@@ -53,6 +53,7 @@ body:
       options:
         - 浏览器（node solver/serve.js）
         - Windows 桌面版（Electron）
+        - Android（Capacitor）
         - 离线导出 HTML
         - 其他
     validations:

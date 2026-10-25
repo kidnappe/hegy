@@ -1,0 +1,37 @@
+name: pages
+
+# 发布页（release-page/）部署到 GitHub Pages：
+# https://kidnappe.github.io/hegy/
+# 首次启用需要在仓库 Settings → Pages → Build and deployment 里把
+# Source 选为「GitHub Actions」，之后 push 即自动部署。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "release-page/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: release-page
+      - id: deployment
+        uses: actions/deploy-pages@v4

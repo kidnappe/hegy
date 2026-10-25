@@ -10,8 +10,6 @@ mobile/node_modules/
 # ============================================================
 desktop/dist/
 desktop/dist-arm64/
-
-# 可选：本地 Android / Capacitor 构建（不随公开仓库分发）
 mobile/www/
 mobile/android/.gradle/
 mobile/android/build/
@@ -26,6 +24,20 @@ mobile/android/capacitor-cordova-android-plugins/
 *.aab
 *.jks
 *.keystore
+
+# ============================================================
+# 内部交接 / 排障记录（不随公开仓库分发）
+# ============================================================
+HANDOVER.md
+HANDOVER-ARCHIVE.md
+AGENT-START-HERE.md
+NETBODY-HANDOVER.md
+VIDEO-HANDOVER.md
+MOBILE-BACKEND-PLAN.md
+SYNC-PLAN.md
+MIGRATION-TO-MAIN.md
+mobile/UI-DIRECTIONS.md
+mobile/UI-DIRECTIONS-2.md
 
 # ============================================================
 # 临时目录、实验脚本与备份（含本机状态，勿入库）
@@ -74,3 +86,8 @@ solver/config.json
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# ============================================================
+# 图标/启动图源文件（已应用到 desktop/build 与 solver/assets，不再重复入库）
+# ============================================================
+何解-视觉资产-第2轮/

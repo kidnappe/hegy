@@ -208,7 +208,7 @@ npm run dist:arm64     # 便携版（ARM64）
 - 便携版把 Electron 用户数据放到 exe 同目录 `HegyData/`。
 - `desktop/package.json` 的 `build.files` 会把 `solver/` 打进包，并排除 `example_*`、`mock.js`、`config.json`、测试脚本等。
 - 根 `LICENSE` 通过 `build.extraResources` 复制到 `resources/app/LICENSE`，保证桌面版导出页能内嵌 AGPL 全文。
-- 桌面版使用 Electron 45；安装 `desktop/` 依赖需要 Node.js 22.12+（应用本体仍支持 Node.js 18+）。
+- 桌面版使用 Electron 26.6.10；安装 `desktop/` 依赖需要 Node.js 18+（应用本体同样支持）。
 - 打包脚本 `desktop/tools/patch-portable-nsis.js` 针对 electron-builder 24.13.3 的 `portable.nsi` 模板做幂等修补；升级 electron-builder 后先确认这两个上游问题是否已修复。
 
 ---

@@ -9,14 +9,23 @@
 <link rel="icon" type="image/png" sizes="256x256" href="assets/icon-256.png" />
 <link rel="stylesheet" href="vendor/jsxgraph.css" />
 <link rel="stylesheet" href="vendor/katex/katex.min.css" />
-<link rel="stylesheet" href="ui.css?v=20261022c" />
+<link rel="stylesheet" href="ui.css?v=20261025b" />
+<link rel="stylesheet" href="skins.css?v=20261024e" />
 <script>
-/* 主题要在首帧前定下来，否则会闪一下白底 */
+/* 主题与皮肤要在首帧前定下来，否则会闪一下白底（口径见 SKIN-SYSTEM.md §3.3）。
+   三套皮肤都支持日间/夜间（P6 起 03/04 夜间为单独设计）；data-theme 只跟用户偏好走。 */
 (function () {
   try {
-    var t = localStorage.getItem("solver_theme_v1");
-    if (t !== "dark" && t !== "light") t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
-    document.documentElement.setAttribute("data-theme", t);
+    var allowed = ["default", "warm", "swiss"];
+    var skin = localStorage.getItem("solver_skin_v1");
+    if (allowed.indexOf(skin) < 0) skin = "default";
+
+    var theme = localStorage.getItem("solver_theme_v1");
+    if (theme !== "dark" && theme !== "light") {
+      theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    document.documentElement.setAttribute("data-skin", skin);
+    document.documentElement.setAttribute("data-theme", theme);
   } catch (e) {}
 })();
 </script>
@@ -30,25 +39,29 @@
     <div class="brand">何解</div>
     <button class="chip" id="cfg" title="点击配置模型"><span class="dot"></span><span class="chip-t">未配置模型</span></button>
     <label id="gradeWrap" for="grade" title="按该年级的知识范围作答">年级
-      <select id="grade">
+      <select id="grade" data-hjsel>
         <option value="">不指定</option>
-        <option value="高三">高三</option>
-        <option value="高二">高二</option>
-        <option value="高一">高一</option>
-        <option value="初三">初三</option>
-        <option value="初二">初二</option>
-        <option value="初一">初一</option>
+        <optgroup label="高中">
+          <option value="高三">高三</option>
+          <option value="高二">高二</option>
+          <option value="高一">高一</option>
+        </optgroup>
+        <optgroup label="初中">
+          <option value="初三">初三</option>
+          <option value="初二">初二</option>
+          <option value="初一">初一</option>
+        </optgroup>
       </select>
     </label>
     <label id="dimWrap" for="dim" title="指定图形用平面还是立体；选“自动”由 AI 判断">图形
-      <select id="dim">
+      <select id="dim" data-hjsel>
         <option value="">自动</option>
         <option value="2d">平面 2D</option>
         <option value="3d">立体 3D</option>
       </select>
     </label>
     <label id="viewWrap" for="view" title="图形怎么画：真实尺寸（严格按题目长度，推荐）／像题图（教材常把高画长，看起来立着，但比例是估的）">画法
-      <select id="view">
+      <select id="view" data-hjsel>
         <option value="true" selected>真实尺寸</option>
         <option value="look">像题图</option>
       </select>
@@ -142,7 +155,7 @@
           <span class="qfloat-t">原题图</span>
           <span class="grow"></span>
           <button class="qfloat-btn" id="qFigOpen" type="button" title="查看大图"><svg class="ico-sm"><use href="#i-image"/></svg></button>
-          <button class="qfloat-btn qfloat-fold" id="qFigFold" type="button" title="展开" aria-expanded="false"><span class="qfold-sign"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="qfold-word">展开</span></button>
+          <button class="qfloat-btn qfloat-fold" id="qFigFold" type="button" title="展开" aria-expanded="false"><span class="qfold-sign"><svg viewBox="0 0 24 24"><path d="M5 12h14"/><path class="qfold-v" d="M12 5v14"/></svg></span><span class="qfold-word">展开</span></button>
         </div>
         <div class="qfloat-b"><div id="qFig"></div></div>
         <div class="qfloat-resize" id="qFigResize" title="拖动调整窗口大小"></div>
@@ -152,7 +165,7 @@
           <span class="qfloat-ico"><svg class="ico-sm"><use href="#i-list"/></svg></span>
           <span class="qfloat-t">原题文字</span>
           <span class="grow"></span>
-          <button class="qfloat-btn qfloat-fold" id="qTextFold" type="button" title="展开" aria-expanded="false"><span class="qfold-sign"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="qfold-word">展开</span></button>
+          <button class="qfloat-btn qfloat-fold" id="qTextFold" type="button" title="展开" aria-expanded="false"><span class="qfold-sign"><svg viewBox="0 0 24 24"><path d="M5 12h14"/><path class="qfold-v" d="M12 5v14"/></svg></span><span class="qfold-word">展开</span></button>
         </div>
         <div class="qfloat-b"><div id="qText"></div></div>
         <div class="qfloat-resize" id="qTextResize" title="拖动调整窗口大小"></div>
@@ -206,7 +219,10 @@
           <div class="ans-note" id="ansNote" style="display:none"></div>
           <div class="ans-edit" id="ansEdit" style="display:none">
             <div class="ans-edit-hint" id="ansEditHint"></div>
-            <textarea id="ansEditIn" rows="3" maxlength="4000" placeholder="把正确答案写在这里，例如：∠DFE=10°；多小问可写 (1)… (2)…；也可以直接粘贴答案截图"></textarea>
+            <div class="ans-edit-box">
+              <textarea id="ansEditIn" rows="3" maxlength="4000" placeholder="把正确答案写在这里，例如：∠DFE=10°；多小问可写 (1)… (2)…；也可以粘贴或上传答案截图"></textarea>
+              <button class="ans-img-pick" id="ansImgPick" type="button" title="上传答案图片" aria-label="上传答案图片"><svg class="ico"><use href="#i-image"/></svg></button>
+            </div>
             <div class="ans-img" id="ansImgBox" style="display:none">
               <img class="ans-img-thumb" id="ansImgThumb" alt="答案截图" />
               <span class="ans-img-cap">已附加答案截图，点重画时由 AI 识别</span>
@@ -214,9 +230,7 @@
             </div>
             <div class="ans-img-hint" id="ansImgHint" style="display:none"></div>
             <div class="ans-edit-actions">
-              <span class="ans-edit-count" id="ansEditCount">0/4000</span>
               <span class="grow"></span>
-              <button class="chat-mini" id="ansEditCancel" type="button">取消</button>
               <button class="ans-redraw" id="ansRedraw" type="button">按此答案重画</button>
             </div>
           </div>
@@ -314,6 +328,7 @@
 <div class="overlay" id="logModal">
   <div class="modal modal-lg logmodal">
     <div class="mhead">
+      <span class="mhead-ico"><svg class="ico"><use href="#i-list"/></svg></span>
       <h2>错误日志</h2>
       <span class="log-sub" id="logSub"></span>
       <button class="dlg-close" id="logClose" type="button" title="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
@@ -330,15 +345,18 @@
 <div id="reviewBar">
   <span class="rtxt">✨ AI 微调已渲染，请拖动几何点测试效果；满意后选择保存方式</span>
   <span id="rbKeepQs"></span>
-  <button id="rbLocate" type="button">定位查看</button>
-  <button id="rbRevert" type="button">撤销回退</button>
-  <button id="rbOverwrite" type="button" title="用这次结果替换当前版本（不保留旧版）">覆盖当前版本</button>
-  <button id="rbKeep" type="button" title="保留当前版本，把这次结果另存为新版本">存为新版本</button>
+  <span id="rbActs">
+    <button id="rbLocate" type="button"><span class="lbl-full">定位查看</span><span class="lbl-short">定位</span></button>
+    <button id="rbRevert" type="button"><span class="lbl-full">撤销回退</span><span class="lbl-short">撤销</span></button>
+    <button id="rbOverwrite" type="button" title="用这次结果替换当前版本（不保留旧版）"><span class="lbl-full">覆盖当前版本</span><span class="lbl-short">覆盖</span></button>
+    <button id="rbKeep" type="button" title="保留当前版本，把这次结果另存为新版本"><span class="lbl-full">存为新版本</span><span class="lbl-short">存新版</span></button>
+  </span>
 </div>
 
 <div class="overlay" id="cfgModal">
   <div class="modal modal-lg">
     <div class="mhead">
+      <span class="mhead-ico"><svg class="ico"><use href="#i-settings"/></svg></span>
       <h2>设置</h2>
       <button class="dlg-close" id="btnCfgClose" title="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
     </div>
@@ -348,7 +366,7 @@
     <!-- 条目：模型配置（默认展开） -->
     <section class="acc open" data-acc="model">
       <header class="acc-h">
-        <svg class="ico acc-i"><use href="#i-sparkles"/></svg>
+        <svg class="ico acc-i"><use href="#i-bot"/></svg>
         <span class="acc-t">模型配置</span>
         <span class="acc-s" id="accModelSum">未配置</span>
         <span class="grow"></span>
@@ -409,7 +427,7 @@
         <div class="field">
           <label>保存位置</label>
           <div class="row">
-            <input id="fHistDir" spellcheck="false" placeholder="~/Documents/Hegy" />
+            <input id="fHistDir" spellcheck="false" placeholder="C:\Users\你的用户名\Documents\Hegy" />
             <button id="btnHistDirPick" type="button">浏览…</button>
             <button id="btnHistDirApply" type="button">应用</button>
             <button id="btnHistDirOpen" type="button">打开</button>
@@ -418,6 +436,33 @@
         </div>
       </div>
     </section>
+    <!-- 条目：外观 / 皮肤（默认收起；口径与预览数据见 skins.js / SKIN-SYSTEM.md §6.3） -->
+    <section class="acc" data-acc="skin">
+      <header class="acc-h">
+        <svg class="ico acc-i"><use href="#i-palette"/></svg>
+        <span class="acc-t">外观</span>
+        <span class="acc-s" id="accSkinSum">原色</span>
+        <span class="grow"></span>
+        <svg class="ico-sm acc-chev"><use href="#i-chevron-down"/></svg>
+      </header>
+      <div class="acc-b">
+        <div class="skin-grid" id="skinGrid"></div>
+        <div class="skin-note">切换立即生效、不刷新页面。三套皮肤均支持日间/夜间，与右上角夜间按钮独立使用。</div>
+        <div class="row" style="margin-top:8px;">
+          <span class="grow"></span>
+          <button class="ghost" id="btnSkinReset" type="button">恢复默认</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 关于（桌面/手机共用入口；点开 aboutModal） -->
+    <button class="about-row" id="btnAbout" type="button" title="版本、更新记录与版权">
+      <svg class="ico acc-i about-i"><use href="#i-info"/></svg>
+      <span class="acc-t">关于何解</span>
+      <span class="acc-s" id="aboutRowVer"></span>
+      <span class="grow"></span>
+      <svg class="ico-sm about-go"><use href="#i-chevron-right"/></svg>
+    </button>
     </div><!-- /.acc-wrap -->
 
     <div class="mfoot">
@@ -430,14 +475,69 @@
   </div>
 </div>
 
-<div class="overlay" id="histModal">
-  <div class="modal">
+<!-- 关于：版本 / 更新记录（GitHub Releases，按端分列）/ 版权 / 爱发电 -->
+<div class="overlay" id="aboutModal">
+  <div class="modal modal-about">
     <div class="mhead">
+      <span class="mhead-ico"><svg class="ico"><use href="#i-info"/></svg></span>
+      <h2>关于</h2>
+      <button class="dlg-close" id="btnAboutX" title="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="mbody about-body">
+      <div class="about-hero">
+        <img class="about-logo" src="assets/icon-64.png" alt="" draggable="false" />
+        <div class="about-hero-t">
+          <b>何解</b><span class="ab-en">Hegy</span>
+        </div>
+        <p class="about-slogan">本地运行的 AI 动态几何解题器</p>
+        <div class="about-verline">
+          <span class="ab-label">当前版本</span>
+          <span class="ab-pill" id="aboutVer">—</span>
+          <span class="ab-pill accent" id="aboutNew" hidden></span>
+          <a class="ab-pill ab-sponsor-pill" id="aboutAfdian" href="#" target="_blank" rel="noopener" hidden title="爱发电 · 支持作者">
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-heart"/></svg>爱发电
+          </a>
+        </div>
+      </div>
+
+      <div class="ab-tab" role="tablist">
+        <button type="button" class="on" data-pane="log">更新记录</button>
+        <button type="button" data-pane="legal">版权与声明</button>
+      </div>
+
+      <div class="about-pane" id="pane-log">
+        <div class="ab-seg" role="tablist">
+          <button type="button" data-end="desktop">电脑端</button>
+          <button type="button" data-end="mobile">手机端</button>
+        </div>
+        <div class="ab-releases" id="aboutReleases"></div>
+      </div>
+
+      <div class="about-pane" id="pane-legal" hidden>
+        <div class="about-legal" id="aboutLegal"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="histModal">
+  <div class="modal modal-hist">
+    <div class="mhead">
+      <span class="mhead-ico"><svg class="ico"><use href="#i-history"/></svg></span>
       <h2>解题记录</h2>
+      <span class="mhead-badge" id="histCount"></span>
       <button class="dlg-close" id="btnHistX" title="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
     </div>
     <div class="mbody">
       <div class="sub" id="histSub">点任意一条即可回看。保存位置可在「设置」里修改。</div>
+      <div class="hist-tools" id="histTools">
+        <div class="hist-search" id="histSearchWrap">
+          <svg class="hist-search-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="histSearch" type="search" placeholder="搜索题目、模型或年级…" autocomplete="off" spellcheck="false" aria-label="搜索解题记录" />
+          <button class="hist-search-x" id="histSearchClear" type="button" title="清空搜索" aria-label="清空搜索"><svg class="ico-sm"><use href="#i-x"/></svg></button>
+        </div>
+        <span class="hist-hint" id="histHint">输入关键字筛选</span>
+      </div>
       <div class="hist-list" id="histList"></div>
     </div>
     <div class="actions">
@@ -451,23 +551,35 @@
 <div class="overlay" id="cropModal">
   <div class="modal modal-crop">
     <div class="mhead">
-      <h2>框选图片</h2>
+      <span class="mhead-ico"><svg class="ico"><use href="#i-crop"/></svg></span>
+      <h2 id="cropTitle">框选图片</h2>
       <button class="dlg-close" id="cropClose" title="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
     </div>
     <div class="mbody crop-body">
       <div class="crop-stage" id="cropStage">
-        <img id="cropImg" alt="" draggable="false" />
-        <div class="crop-sel" id="cropSel">
-          <i class="ch" data-corner="nw"></i><i class="ch" data-corner="ne"></i>
-          <i class="ch" data-corner="sw"></i><i class="ch" data-corner="se"></i>
+        <div class="crop-frame" id="cropFrame">
+          <img id="cropImg" alt="" draggable="false" />
+          <div class="crop-sel" id="cropSel">
+            <i class="ch" data-corner="nw"></i><i class="ch" data-corner="n"></i>
+            <i class="ch" data-corner="ne"></i><i class="ch" data-corner="e"></i>
+            <i class="ch" data-corner="se"></i><i class="ch" data-corner="s"></i>
+            <i class="ch" data-corner="sw"></i><i class="ch" data-corner="w"></i>
+          </div>
         </div>
       </div>
+      <div class="crop-side">
+        <div class="crop-prev">
+          <div class="crop-prev-h"><span>裁剪预览</span><span id="cropSize">整张图</span></div>
+          <div class="crop-prev-box"><canvas id="cropPreview"></canvas></div>
+        </div>
+        <div class="crop-tip" id="cropMsg">拖动边角调整范围，点 ✓ 采纳，✗ 放弃</div>
+      </div>
     </div>
-    <div class="mfoot">
-      <span class="grow" id="cropMsg">在图上拖动框出要保留的区域</span>
+    <div class="mfoot crop-foot">
+      <button class="ghost" id="cropRetake" type="button">重拍</button>
       <button class="ghost" id="cropFull" type="button">全图</button>
-      <button class="ghost" id="cropCancel" type="button">取消</button>
-      <button class="primary" id="cropOk" type="button">用这张</button>
+      <button class="ghost" id="cropCancel" type="button">✗ 不要</button>
+      <button class="primary" id="cropOk" type="button">✓ 用这张</button>
     </div>
   </div>
 </div>
@@ -478,85 +590,17 @@
   <div class="lbhint">点击任意处关闭</div>
 </div>
 
-<!-- 导出离线 HTML 时会原样嵌入这份许可声明，确保单文件分发也带署名。 -->
-<script type="text/plain" id="hjThirdPartyLicenses">
-何解导出的离线页面包含以下第三方组件：
-
---------------------------------------------------------------------
-JSXGraph 1.12.2
-Copyright 2008-2025
-    Matthias Ehmann,
-    Michael Gerhaeuser,
-    Carsten Miller,
-    Bianca Valentin,
-    Andreas Walter,
-    Alfred Wassermann,
-    Peter Wilfahrt
-
-本项目按 MIT 分支使用。MIT License:
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
---------------------------------------------------------------------
-KaTeX 0.19.0
-Copyright (c) 2013-2020 Khan Academy and other contributors
-MIT License (same text as above).
-
---------------------------------------------------------------------
-three.js r128 / OrbitControls r128
-Copyright 2010-2021 Three.js Authors
-MIT License (same text as above).
-
---------------------------------------------------------------------
-Lucide Icons 1.59.0
-Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022
-as part of Feather (MIT). All other copyright (c) for Lucide are held by
-Lucide Contributors 2022.
-
-ISC License:
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
---------------------------------------------------------------------
-何解 / Hegy 自身代码以 AGPL-3.0-only 授权。
-完整条款见项目仓库根目录 LICENSE，或 https://www.gnu.org/licenses/agpl-3.0.txt 。
-</script>
-
 <script src="vendor/icons.js"></script>
 <script src="vendor/jsxgraph.js"></script>
 <script src="geometry.js"></script>
 <script src="vendor/katex/katex.min.js"></script>
 <script src="vendor3d/three.min.js"></script>
 <script src="vendor3d/OrbitControls.js"></script>
-<script src="vendor3d/render3d.js?v=20261022a"></script>
+<script src="vendor3d/render3d.js?v=20261024e"></script>
 <script src="shim.js"></script>
-<script src="ui.js?v=20261022b"></script>
-<script src="solver.js?v=20261022b"></script>
+<script src="skins.js?v=20261024e"></script>
+<script src="ui.js?v=20261025a"></script>
+<script src="solver.js?v=20261025a"></script>
+<script src="about.js?v=20261025a"></script>
 </body>
 </html>

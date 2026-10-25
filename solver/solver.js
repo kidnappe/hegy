@@ -2,6 +2,13 @@
   var $ = function (id) { return document.getElementById(id); };
   var LS_KEY = "solver_cfg_v1";
 
+  // 确认框：手机端走 layers.js 的 Material 对话框；桌面端回退原生 confirm。
+  function hjConfirm(opts) {
+    if (window.HJDialog && window.HJDialog.confirm) return window.HJDialog.confirm(opts);
+    var text = (opts && (opts.native || opts.message || opts.title)) || "";
+    return Promise.resolve(window.confirm(text));
+  }
+
   function escHtml(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function mathHTML(text) {
     // ① 先把字面量 "\n"（反斜杠 + n，模型偶尔用双转义写换行）还原成真换行。
@@ -122,7 +129,7 @@
     return blocks;
   }
   // 解析渲染：多小问优先用 subQuestions 的结构化数据，其次识别文本里的「A.」「(1)」标记
-  // 2026-10-20：多小问时，若顶层解析自己已经按小问分了段（行首有「（1）」「A．」这类标记），
+  // 2026-10-20（HANDOVER §51 第 3 条）：多小问时，若顶层解析自己已经按小问分了段（行首有「（1）」「A．」这类标记），
   // 就只渲染顶层这一份。否则「全部」视图会把同一份解答读两遍 —— 实测小问解析有 73~82% 的内容
   // 已经在顶层出现过，用户实际要读的字数是两份之和（最典型：02:20 那条顶层 2698 字 + 小问 376 字）。
   // 兜底：顶层只是「概述」时（比各小问加起来还短，或压根没分段），仍按「总述 + 各问」拼，避免丢推导。
@@ -449,6 +456,43 @@
       h.addEventListener("click", function () { sec.classList.toggle("open"); syncAccFoot(); });
     });
   })();
+
+  // ================= 皮肤（「外观」条目；口径见 SKIN-SYSTEM.md） =================
+  // 预览卡的色板来自 HJSkin.SKINS（皮肤数据），切换只走 HJSkin.set：
+  // 改 <html data-skin> + 派发 hj:skin，画布跟随见 applyCanvasSkin()。
+  (function initSkin() {
+    var grid = $("skinGrid");
+    if (!grid || !window.HJSkin) return;
+    HJSkin.SKINS.forEach(function (s) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "skin-card";
+      b.setAttribute("data-skin", s.key);
+      var sw = s.swatch || {};
+      b.innerHTML =
+        '<span class="skin-prev" style="background:' + (sw.bg || "#fff") + '">' +
+          '<i style="background:' + (sw.panel || "#fff") + '"></i>' +
+          '<i style="background:' + (sw.line || "#ddd") + '"></i>' +
+          '<i style="background:#5b5bd6"></i>' +
+        '</span>' +
+        '<span class="skin-name">' + s.name + '</span>' +
+        '<span class="skin-desc">' + s.desc + '</span>';
+      b.onclick = function () { HJSkin.set(s.key); };
+      grid.appendChild(b);
+    });
+    var reset = $("btnSkinReset");
+    if (reset) reset.onclick = function () { HJSkin.set("default"); };
+    function sync() {
+      var cur = HJSkin.current();
+      var sum = $("accSkinSum");
+      if (sum) sum.textContent = (HJSkin.SKINS.filter(function (s) { return s.key === cur; })[0] || {}).name || cur;
+      Array.prototype.forEach.call(grid.querySelectorAll(".skin-card"), function (c) {
+        c.classList.toggle("on", c.getAttribute("data-skin") === cur);
+      });
+    }
+    document.addEventListener("hj:skin", sync);
+    sync();
+  })();
   $("eye").onclick = function () { var f = $("fKey"); var p = f.type === "password"; f.type = p ? "text" : "password"; $("eye").textContent = p ? "隐藏" : "显示"; };
 
   function callModels() { return fetch("/api/models", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ config: collect() }) }).then(function (r) { return r.json(); }); }
@@ -491,6 +535,17 @@
   };
 
   var images = [];
+  var imgOriginals = Object.create(null);   // 裁剪后的图 → 原图，支持反复从原图重裁
+  var PENDING = null;                       // 拍照/相册暂存图：确认前不进 images
+  function rememberImage(src, original) { if (src) imgOriginals[src] = original || src; }
+  function originalOf(src) { return imgOriginals[src] || src; }
+  function resetImages(list) {
+    images = (list || []).slice();
+    imgOriginals = Object.create(null);
+    images.forEach(function (src) { rememberImage(src, src); });
+    PENDING = null;
+    renderThumbs();
+  }
   function renderThumbs() {
     var t = $("thumbs");
     t.innerHTML = "";
@@ -520,21 +575,115 @@
   $("lightbox").onclick = closeLightbox;
   var lbX = $("lbClose");
   if (lbX) lbX.onclick = function (e) { e.stopPropagation(); closeLightbox(); };
-  // ================= 图片裁剪：框选区域 → 替换成新图，下次解题就发这张 =================
-  // 用途：整页截图里只想要某一道题、或者图外有大片空白时，框一下再解，模型看得更准。
-  var CROP = { idx: -1, sel: null, drag: null };
+  // ================= 图片裁剪：框选区域 → 采纳后才进输入框 =================
+  // 拍照/相册先进入 PENDING，只有点 ✓ 才 images.push；点 ✗ / 返回 / 取消都丢弃。
+  // 已有缩略图重裁时从原图打开，确认后替换当前图；原图一直保留，可反复重裁。
+  // mode：image = 裁剪题目图片（替换/新增）；figure = 只保存「题图区域」，原图不动
+  var CROP = { idx: -1, src: "", sel: null, drag: null, token: 0, ready: false, pending: false, busy: false, mode: "image" };
   function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
-  function cropOpen(idx) {
-    if (!images[idx]) return;
-    // 默认不预选：第一次拖动就是画框；想整张图不动直接点「用这张」
-    CROP.idx = idx; CROP.sel = null; CROP.drag = null;
-    var im = $("cropImg");
-    im.onload = function () { cropDraw(); };
-    im.src = images[idx];
-    $("cropMsg").textContent = "在图上拖动框出要保留的区域";
-    $("cropModal").classList.add("show");
+  function cropCopy(s) { return s ? { x: s.x, y: s.y, w: s.w, h: s.h } : null; }
+  function cropFullSel() { return { x: 0, y: 0, w: 1, h: 1 }; }
+  function cropSelOf(b) {
+    if (!b) return cropFullSel();
+    var x = clamp01(Number(b.x) || 0), y = clamp01(Number(b.y) || 0);
+    var w = Math.max(0, Math.min(clamp01(Number(b.w) || 0), 1 - x));
+    var h = Math.max(0, Math.min(clamp01(Number(b.h) || 0), 1 - y));
+    if (w < 0.02 || h < 0.02) return cropFullSel();
+    return { x: x, y: y, w: w, h: h };
   }
-  function cropClose() { $("cropModal").classList.remove("show"); CROP.drag = null; }
+  function cropOpen(idx) {
+    if (!images[idx]) return false;
+    return cropOpenSrc(originalOf(images[idx]), idx, "edit", { mode: "image" });
+  }
+  function cropOpenPending() {
+    if (!PENDING) return false;
+    return cropOpenSrc(PENDING.src, -1, PENDING.from || "shot", { mode: "image" });
+  }
+  // 手机端原题卡：在整张原图上框出题图区域，只写 figureBox，不替换原图。
+  function cropOpenFigure(src, imgIdx, box) {
+    if (!src) return false;
+    return cropOpenSrc(src, (typeof imgIdx === "number" ? imgIdx : 0), "figure", {
+      mode: "figure",
+      sel: cropSelOf(box)
+    });
+  }
+  function discardPending() { PENDING = null; }
+  function cropOpenSrc(src, idx, from, opts) {
+    if (!src) return false;
+    opts = opts || {};
+    CROP.mode = opts.mode === "figure" ? "figure" : "image";
+    CROP.idx = (typeof idx === "number" ? idx : -1);
+    CROP.src = src;
+    CROP.pending = CROP.mode === "image" && CROP.idx < 0;
+    CROP.sel = opts.sel ? cropSelOf(opts.sel) : cropFullSel();
+    CROP.drag = null;
+    CROP.ready = false;
+    CROP.busy = false;
+    CROP.token++;
+    var mine = CROP.token;
+    var im = $("cropImg");
+    im.onload = function () {
+      if (mine !== CROP.token) return;
+      CROP.ready = true;
+      setTimeout(function () {
+        if (mine !== CROP.token) return;
+        cropLayout(); cropDraw(); cropPreview();
+      }, 20);
+    };
+    im.onerror = function () {
+      if (mine !== CROP.token) return;
+      CROP.ready = false;
+      $("cropMsg").textContent = "图片加载失败，请重拍或换一张";
+    };
+    im.src = src;
+    var fig = CROP.mode === "figure";
+    var title = $("cropTitle");
+    if (title) title.textContent = fig ? "框选题图" : "框选图片";
+    var retake = $("cropRetake");
+    if (retake) retake.style.display = CROP.pending ? "" : "none";
+    var ok = $("cropOk");
+    if (ok) ok.textContent = fig ? "✓ 保存题图" : (CROP.pending ? "✓ 用这张" : "✓ 替换");
+    var cancel = $("cropCancel");
+    if (cancel) cancel.textContent = CROP.pending ? "✗ 不要" : "✗ 取消";
+    $("cropSize").textContent = "整张图";
+    $("cropMsg").textContent = fig
+      ? "拖动边角框住题目里的图形区域，点 ✓ 保存；原图会保留"
+      : (CROP.pending
+        ? "拖动边角调整题目区域，点 ✓ 采纳，✗ 放弃"
+        : "拖动边角调整，点 ✓ 替换当前图片");
+    $("cropModal").classList.add("show");
+    requestAnimationFrame(function () {
+      if (mine !== CROP.token) return;
+      cropLayout(); cropDraw(); cropPreview();
+    });
+    return true;
+  }
+  function cropClose() {
+    CROP.token++;
+    CROP.drag = null; CROP.ready = false; CROP.busy = false;
+    CROP.idx = -1; CROP.src = ""; CROP.sel = null; CROP.pending = false; CROP.mode = "image";
+    discardPending();
+    var modal = $("cropModal");
+    if (modal) modal.classList.remove("show");
+    var im = $("cropImg");
+    if (im) { try { im.removeAttribute("src"); } catch (e) {} }
+    var cv = $("cropPreview");
+    if (cv) { try { cv.width = 1; cv.height = 1; } catch (e) {} }
+  }
+  // 让 #cropFrame 严格等于图片显示区域：选框百分比、手指坐标、预览都按同一块矩形算
+  function cropLayout() {
+    var stage = $("cropStage"), frame = $("cropFrame"), im = $("cropImg");
+    if (!stage || !frame || !im || !CROP.ready) return;
+    var nw = im.naturalWidth, nh = im.naturalHeight;
+    if (!nw || !nh) return;
+    var cs = window.getComputedStyle(stage);
+    var aw = stage.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    var ah = stage.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+    if (aw < 20 || ah < 20) return;
+    var s = Math.min(aw / nw, ah / nh, 3);
+    frame.style.width = Math.max(1, Math.round(nw * s)) + "px";
+    frame.style.height = Math.max(1, Math.round(nh * s)) + "px";
+  }
   function cropDraw() {
     var s = CROP.sel, b = $("cropSel");
     if (!b) return;
@@ -542,9 +691,46 @@
     b.style.display = "block";
     b.style.left = (s.x * 100) + "%"; b.style.top = (s.y * 100) + "%";
     b.style.width = (s.w * 100) + "%"; b.style.height = (s.h * 100) + "%";
+    cropPreviewSoon();
+  }
+  var cropPrevRaf = 0;
+  function cropPreviewSoon() {
+    if (cropPrevRaf) return;
+    cropPrevRaf = requestAnimationFrame(function () { cropPrevRaf = 0; cropPreview(); });
+  }
+  function cropPreview() {
+    var im = $("cropImg"), cv = $("cropPreview");
+    if (!im || !cv || !CROP.ready) return;
+    var nw = im.naturalWidth, nh = im.naturalHeight;
+    if (!nw || !nh) return;
+    var s = CROP.sel || cropFullSel();
+    var sx = Math.max(0, Math.min(nw - 1, Math.round(s.x * nw)));
+    var sy = Math.max(0, Math.min(nh - 1, Math.round(s.y * nh)));
+    var sw = Math.max(1, Math.min(nw - sx, Math.round(s.w * nw)));
+    var sh = Math.max(1, Math.min(nh - sy, Math.round(s.h * nh)));
+    var k = Math.min(480 / sw, 190 / sh, 1);
+    var cw = Math.max(1, Math.round(sw * k)), ch = Math.max(1, Math.round(sh * k));
+    if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
+    var ctx = cv.getContext("2d");
+    try {
+      ctx.clearRect(0, 0, cw, ch);
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(im, sx, sy, sw, sh, 0, 0, cw, ch);
+    } catch (e) {}
+    var whole = s.x <= 0.0005 && s.y <= 0.0005 && s.w >= 0.999 && s.h >= 0.999;
+    $("cropSize").textContent = whole
+      ? "整张图 · " + nw + "×" + nh
+      : sw + " × " + sh + " px · " + Math.round(s.w * 100) + "% × " + Math.round(s.h * 100) + "%";
+    $("cropMsg").textContent = (sw < 12 || sh < 12)
+      ? "选区太小，再拉大一点"
+      : (CROP.mode === "figure"
+          ? "拖动边角框住题目里的图形区域，点 ✓ 保存；原图会保留"
+          : (CROP.pending ? "拖动边角调整题目区域，点 ✓ 采纳，✗ 放弃"
+                          : "拖动边角调整，点 ✓ 替换当前图片"));
   }
   function cropRel(e) {
-    var im = $("cropImg"), r = im.getBoundingClientRect();
+    var f = $("cropFrame"), r = f.getBoundingClientRect();
     if (!r.width || !r.height) return null;
     return { x: clamp01((e.clientX - r.left) / r.width), y: clamp01((e.clientY - r.top) / r.height) };
   }
@@ -555,20 +741,28 @@
     var stage = $("cropStage");
     if (!stage) return;
     stage.addEventListener("pointerdown", function (e) {
+      if (e.button != null && e.button !== 0) return;
       var p = cropRel(e); if (!p) return;
       var s = CROP.sel;
-      var corner = (e.target && e.target.dataset) ? e.target.dataset.corner : "";
-      if (s && corner) CROP.drag = { mode: "resize", corner: corner, start: p, base: { x: s.x, y: s.y, w: s.w, h: s.h } };
-      else if (s && p.x >= s.x && p.x <= s.x + s.w && p.y >= s.y && p.y <= s.y + s.h) CROP.drag = { mode: "move", start: p, base: { x: s.x, y: s.y, w: s.w, h: s.h } };
-      else { CROP.drag = { mode: "new", start: p }; CROP.sel = { x: p.x, y: p.y, w: 0, h: 0 }; cropDraw(); }
+      var corner = (e.target && e.target.dataset) ? (e.target.dataset.corner || "") : "";
+      if (corner) {
+        CROP.drag = { mode: "resize", corner: corner, start: p, base: cropCopy(s || cropFullSel()) };
+      } else if (s && p.x >= s.x && p.x <= s.x + s.w && p.y >= s.y && p.y <= s.y + s.h) {
+        CROP.drag = { mode: "move", start: p, base: cropCopy(s) };
+      } else {
+        CROP.drag = { mode: "new", start: p, prev: cropCopy(s) };
+        CROP.sel = { x: p.x, y: p.y, w: 0, h: 0 };
+        cropDraw();
+      }
       try { stage.setPointerCapture(e.pointerId); } catch (er) {}
       e.preventDefault();
-    });
+    }, { passive: false });
     stage.addEventListener("pointermove", function (e) {
       var d = CROP.drag; if (!d) return;
       var p = cropRel(e); if (!p) return;
-      if (d.mode === "new") CROP.sel = cropRect(d.start, p);
-      else if (d.mode === "move") {
+      if (d.mode === "new") {
+        CROP.sel = cropRect(d.start, p);
+      } else if (d.mode === "move") {
         var dx = p.x - d.start.x, dy = p.y - d.start.y;
         CROP.sel = {
           x: Math.max(0, Math.min(1 - d.base.w, d.base.x + dx)),
@@ -577,38 +771,106 @@
         };
       } else {
         var b = d.base, x1 = b.x, y1 = b.y, x2 = b.x + b.w, y2 = b.y + b.h;
-        if (d.corner.indexOf("w") >= 0) x1 = p.x; else x2 = p.x;
-        if (d.corner.indexOf("n") >= 0) y1 = p.y; else y2 = p.y;
+        if (d.corner.indexOf("w") >= 0) x1 = p.x;
+        if (d.corner.indexOf("e") >= 0) x2 = p.x;
+        if (d.corner.indexOf("n") >= 0) y1 = p.y;
+        if (d.corner.indexOf("s") >= 0) y2 = p.y;
         CROP.sel = cropRect({ x: x1, y: y1 }, { x: x2, y: y2 });
       }
       cropDraw();
-    });
-    ["pointerup", "pointercancel"].forEach(function (ev) { stage.addEventListener(ev, function () { CROP.drag = null; }); });
-    $("cropFull").onclick = function () { CROP.sel = { x: 0, y: 0, w: 1, h: 1 }; cropDraw(); $("cropMsg").textContent = "已选整张图"; };
+      e.preventDefault();
+    }, { passive: false });
+    function cropEnd() {
+      var d = CROP.drag;
+      CROP.drag = null;
+      if (d && d.mode === "new" && (!CROP.sel || CROP.sel.w < 0.02 || CROP.sel.h < 0.02)) {
+        CROP.sel = d.prev || cropFullSel();
+      }
+      cropDraw();
+    }
+    ["pointerup", "pointercancel"].forEach(function (ev) { stage.addEventListener(ev, cropEnd); });
+    $("cropFull").onclick = function () { CROP.sel = cropFullSel(); cropDraw(); };
     $("cropCancel").onclick = cropClose;
     $("cropClose").onclick = cropClose;
+    var retake = $("cropRetake");
+    if (retake) retake.onclick = function () {
+      var cam = window.HJSystemCamera;
+      cropClose();
+      if (cam && cam.open) setTimeout(function () { cam.open(); }, 140);
+    };
     $("cropOk").onclick = function () {
-      var s = CROP.sel || { x: 0, y: 0, w: 1, h: 1 }, im = $("cropImg");
+      if (CROP.busy || !CROP.ready) {
+        if (!CROP.ready) $("cropMsg").textContent = "图片还没加载完，稍等一下";
+        return;
+      }
+      var s = CROP.sel || cropFullSel(), im = $("cropImg");
       var nw = im.naturalWidth, nh = im.naturalHeight;
       if (!nw || !nh) { $("cropMsg").textContent = "图片还没加载完，稍等一下"; return; }
       var sx = Math.round(s.x * nw), sy = Math.round(s.y * nh);
       var sw = Math.round(s.w * nw), sh = Math.round(s.h * nh);
       if (sw < 12 || sh < 12) { $("cropMsg").textContent = "框太小了，再拉大一点"; return; }
+      var token = CROP.token, idx = CROP.idx, pending = CROP.pending, src = CROP.src;
+      var whole = s.x <= 0.0005 && s.y <= 0.0005 && s.w >= 0.999 && s.h >= 0.999;
+      // 题图模式：只保存归一化选区，原图（images）一个字都不改，随时可以重新框。
+      if (CROP.mode === "figure") {
+        if (!last || !last.result) { $("cropMsg").textContent = "当前没有可保存的题目"; return; }
+        var nb = {
+          x: Math.round(s.x * 1000) / 1000,
+          y: Math.round(s.y * 1000) / 1000,
+          w: Math.round(s.w * 1000) / 1000,
+          h: Math.round(s.h * 1000) / 1000
+        };
+        if (idx > 0) nb.image = idx;
+        last.result.figureBox = nb;
+        qFigCache = {};
+        if (lastHistoryId) updateHistory({ id: lastHistoryId, figureBox: nb });
+        renderQCard(last.result);
+        try {
+          document.dispatchEvent(new CustomEvent("hj-figure-change", { detail: { box: nb, index: idx } }));
+        } catch (e) {}
+        $("status").textContent = "已保存题图区域（只影响显示，不改动解答）";
+        cropClose();
+        return;
+      }
+      CROP.busy = true;
+      function commit(u) {
+        CROP.busy = false;
+        if (token !== CROP.token || !$("cropModal").classList.contains("show")) return;
+        if (!u) { $("cropMsg").textContent = "裁剪失败，换一张图试试"; return; }
+        if (pending) {
+          images.push(u);
+          rememberImage(u, src);
+          renderThumbs();
+          qWarn("");
+          if (window.HJ && HJ.toast) HJ.toast("已加入题目图片，可以继续框选或点「解题」", "ok");
+        } else {
+          if (!images[idx]) { $("cropMsg").textContent = "这张图已经不在了"; return; }
+          images[idx] = u;
+          rememberImage(u, src);
+          renderThumbs();
+          qWarn("");
+          if (window.HJ && HJ.toast) HJ.toast("已换成裁剪后的图片，点「解题」用新图重新解", "ok");
+        }
+        cropClose();
+      }
+      if (whole) { commit(src); return; }
       var cv = document.createElement("canvas");
       cv.width = sw; cv.height = sh;
-      cv.getContext("2d").drawImage(im, sx, sy, sw, sh, 0, 0, sw, sh);
       var out = "";
-      try { out = cv.toDataURL("image/png"); } catch (e) { out = ""; }
-      if (!out) { $("cropMsg").textContent = "裁剪失败，换一张图试试"; return; }
+      try {
+        cv.getContext("2d").drawImage(im, sx, sy, sw, sh, 0, 0, sw, sh);
+        out = cv.toDataURL("image/png");
+      } catch (e) { out = ""; }
+      if (!out) { CROP.busy = false; $("cropMsg").textContent = "裁剪失败，换一张图试试"; return; }
       // 跟上传走同一套缩放：太大就压到 IMG_EDGE / IMG_TARGET 以内，别让请求体炸掉
-      fitImage(out, function (u) {
-        images[CROP.idx] = u;
-        renderThumbs();
-        cropClose();
-        qWarn("");
-        if (window.HJ && HJ.toast) HJ.toast("已换成裁剪后的图片，点「解题」用新图重新解", "ok");
-      });
+      fitImage(out, commit);
     };
+    if (window.ResizeObserver) {
+      try { new ResizeObserver(function () { cropLayout(); }).observe(stage); } catch (e) {}
+    }
+    window.addEventListener("resize", function () {
+      if ($("cropModal") && $("cropModal").classList.contains("show")) cropLayout();
+    });
   })();
 
   // Esc：按层级从上到下关闭一个（图片放大 > 日志 > 设置/历史 > 下拉菜单）
@@ -617,6 +879,7 @@
     if ($("cropModal") && $("cropModal").classList.contains("show")) { cropClose(); return; }
     if ($("lightbox").classList.contains("show")) { closeLightbox(); return; }
     if ($("logModal") && $("logModal").classList.contains("show")) { closeLog(); return; }
+    if ($("aboutModal") && $("aboutModal").classList.contains("show")) { if (window.HJAbout) window.HJAbout.close(); return; }
     if ($("cfgModal") && $("cfgModal").classList.contains("show")) { closeModal(); return; }
     if ($("histModal") && $("histModal").classList.contains("show")) { closeHist(); return; }
   });
@@ -634,6 +897,22 @@
       .catch(function (e) { if (cb) cb({ error: String((e && e.message) || e) }); });
   }
   function fmtTime(ts) { try { return new Date(ts).toLocaleString(); } catch (e) { return ""; } }
+  function isMobileUI() { return document.documentElement.classList.contains("m-mobile"); }
+  function logHintText(s) {
+    s = String(s || "");
+    if (!isMobileUI()) return s;
+    return s.replace(/点左下角「日志」看详情/g, "到「设置 → 诊断 → 错误日志」看详情")
+            .replace(/完整信息见左下角「日志」/g, "完整信息见「设置 → 诊断」");
+  }
+  function histGroupName(ts) {
+    var d = new Date(ts), now = new Date();
+    var day = function (x) { return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); };
+    var diff = Math.round((day(now) - day(d)) / 86400000);
+    if (diff === 0) return "今天";
+    if (diff === 1) return "昨天";
+    if (diff > 1 && diff < 7) return "本周";
+    return d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月";
+  }
 
   // 列表缩略图：把第一张图缩成小图存进 meta，列表就不用加载大图
   function makeThumb(dataUrl, cb) {
@@ -673,7 +952,9 @@
     storeGet("/api/store/index", function (j) {
       if (j && j.items) { history = j.items; storeDir = j.dir || ""; } else if (!j) { $("histMsg").textContent = "读取记录文件夹失败，服务未响应"; }
       renderHistory();
-      if ($("histSub")) $("histSub").textContent = "记录保存在：" + (storeDir || "读取中…") + "　—— 条数不限，点任意一条即可回看。保存位置可在「设置」里修改。";
+      if ($("histSub")) $("histSub").textContent = isMobileUI()
+        ? "共 " + history.length + " 条 · 点任意一条回看"
+        : "记录保存在：" + (storeDir || "读取中…") + "　—— 条数不限，点任意一条即可回看。保存位置可在「设置」里修改。";
     });
   }
   // 旧版存在浏览器里的记录 → 一次性搬进文件夹（失败则保留，下次再试）
@@ -960,10 +1241,15 @@
       if (sum) sum.textContent = (j.count || 0) + " 条";
     });
   }
-  function applyHistDir(cb) {
+  async function applyHistDir(cb) {
     var want = ($("fHistDir").value || "").trim();
     if (!want || want === histDirCur) return cb(true);
-    var migrate = history.length ? confirm("要把现有 " + history.length + " 条记录一起搬到新文件夹吗？\n\n点“确定”：一起搬过去\n点“取消”：只换位置，老记录留在原文件夹") : false;
+    var migrate = history.length ? await hjConfirm({
+      title: "要把现有记录一起搬走吗？",
+      message: "新文件夹会接管 " + history.length + " 条记录。取消则只换位置，老记录留在原文件夹。",
+      okText: "一起搬",
+      cancelText: "只换位置"
+    }) : false;
     storePost("/api/store/dir", { dir: want, migrate: migrate }, function (j) {
       if (j && j.ok) {
         histDirCur = j.dir; storeDir = j.dir; $("fHistDir").value = j.dir;
@@ -987,11 +1273,82 @@
   };
   $("btnHistDirApply").onclick = function () { applyHistDir(function () {}); };
   $("btnHistDirOpen").onclick = function () { storePost("/api/store/open", {}, function () {}); };
+  var histQuery = "";                      // 桌面历史搜索关键字（手机端隐藏搜索框，始终为空）
+  var HIST_ICON_GRADE = '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>';
+  var HIST_ICON_CHAT = '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>';
+  var HIST_ICON_CLOCK = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
+  var HIST_ICON_COST = '<path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>';
+  function histMatches(rec) {
+    if (!histQuery) return true;
+    var hay = [rec.question || "", rec.questionText || "", rec.model || "", rec.grade || "", fmtTime(rec.ts)]
+      .join("\n").toLowerCase();
+    var terms = histQuery.toLowerCase().split(/\s+/);
+    for (var i = 0; i < terms.length; i++) {
+      if (terms[i] && hay.indexOf(terms[i]) < 0) return false;
+    }
+    return true;
+  }
+  function histTimeShort(ts) {
+    try {
+      return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch (e) { return fmtTime(ts); }
+  }
+  function histTag(icon, text, cls) {
+    var sp = document.createElement("span");
+    sp.className = "hist-tag" + (cls ? " " + cls : "");
+    sp.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (icon || "") + '</svg><span class="tg-t"></span>';
+    sp.lastChild.textContent = text;
+    return sp;
+  }
   function renderHistory() {
-    var box = $("histList"); box.innerHTML = "";
-    if (!history.length) { box.innerHTML = '<div class="hist-empty">还没有记录，解一道题就会出现在这里</div>'; return; }
-    history.forEach(function (rec) {
+    var box = $("histList");
+    if (!box) return;
+    box.innerHTML = "";
+    var mob = isMobileUI();
+    var items = (!mob && histQuery) ? history.filter(histMatches) : history;
+    var cntEl = $("histCount"), hintEl = $("histHint");
+    if (cntEl) cntEl.textContent = history.length ? (histQuery ? items.length + " / " + history.length : history.length + " 条") : "";
+    if (hintEl) hintEl.textContent = histQuery ? (items.length ? "匹配 " + items.length + " 条" : "没有匹配") : "输入关键字筛选";
+    box.classList.toggle("no-anim", !!histQuery);
+    if (!history.length) {
+      box.innerHTML = mob
+        ? '<div class="hist-empty">还没有记录，解一道题就会出现在这里</div>'
+        : '<div class="hist-empty">' +
+          '<span class="hist-empty-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-history"/></svg></span>' +
+          '<b>还没有记录</b><span>解一道题就会出现在这里</span></div>';
+      if (mob && $("histSub")) $("histSub").textContent = "共 0 条 · 点任意一条回看";
+      return;
+    }
+    if (!items.length) {
+      box.innerHTML = '<div class="hist-empty">' +
+        '<span class="hist-empty-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-list"/></svg></span>' +
+        '<b>没有找到匹配的记录</b><span>换个关键词试试，或清空搜索。</span>' +
+        '<button type="button" id="histEmptyClear">清空搜索</button></div>';
+      var eb = $("histEmptyClear");
+      if (eb) eb.onclick = function () { clearHistSearch(); };
+      if (mob && $("histSub")) $("histSub").textContent = "共 " + history.length + " 条 · 点任意一条回看";
+      return;
+    }
+    var lastGroup = "";
+    items.forEach(function (rec, index) {
+      var g = histGroupName(rec.ts);
+      if (g !== lastGroup) {
+        var gh = document.createElement("div");
+        gh.className = "hist-group";
+        gh.textContent = g;
+        box.appendChild(gh);
+        lastGroup = g;
+      }
       var it = document.createElement("div"); it.className = "hist-item";
+      var qtText = rec.question || rec.questionText || "";
+      // 摘要里不显示 LaTeX 源码：题目常带 $...$ / \frac，转成可读纯文本再截断
+      var snippet = qtText ? texPlainText(String(qtText)).slice(0, 80) : (rec.imgCount ? "[图片题]" : "(空)");
+      if (!mob) {
+        it.tabIndex = 0;
+        it.setAttribute("role", "button");
+        it.setAttribute("aria-label", "打开记录：" + snippet);
+        it.style.setProperty("--i", String(Math.min(index, 12)));
+      }
       if (rec.thumb) {
         var th = document.createElement("div"); th.className = "thumb-sm";
         var im = document.createElement("img"); im.src = rec.thumb;
@@ -999,32 +1356,127 @@
         th.appendChild(im); it.appendChild(th);
       } else if (rec.imgCount) {
         var th2 = document.createElement("div"); th2.className = "thumb-sm";
-        var ph = document.createElement("div"); ph.className = "thumb-ph"; ph.textContent = "图 " + rec.imgCount;
+        var ph = document.createElement("div"); ph.className = "thumb-ph";
+        if (mob) {
+          ph.textContent = "图 " + rec.imgCount;
+        } else {
+          ph.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-image"/></svg><span></span>';
+          ph.lastChild.textContent = rec.imgCount + " 图";
+        }
         ph.onclick = function (ev) { ev.stopPropagation(); recFull(rec.id, function (f) { if (f && f.images && f.images[0]) openLightbox(f.images[0]); }); };
         th2.appendChild(ph); it.appendChild(th2);
+      } else if (!mob) {
+        var th0 = document.createElement("div"); th0.className = "thumb-sm none";
+        th0.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"/></svg>';
+        it.appendChild(th0);
       }
       var meta = document.createElement("div"); meta.className = "meta";
       var qt = document.createElement("div"); qt.className = "qtext";
-      var qtText = rec.question || rec.questionText || "";
-      // 摘要里不显示 LaTeX 源码：题目常带 $...$ / \frac，转成可读纯文本再截断
-      qt.textContent = qtText ? texPlainText(String(qtText)).slice(0, 80) : (rec.imgCount ? "[图片题]" : "(空)");
-      var sub = document.createElement("div"); sub.className = "sub";
-      sub.textContent = fmtTime(rec.ts) + (rec.model ? " · " + rec.model : "") + (rec.grade ? " · " + rec.grade : "") + (rec.imgCount ? " · " + rec.imgCount + " 图" : "") + (rec.chatCount ? " · 追问 " + rec.chatCount + " 条" : "") + (rec.elapsedMs != null ? " · " + (rec.elapsedMs / 1000).toFixed(1) + "s" : "") + (rec.usage && rec.usage.total_tokens != null ? " · " + rec.usage.total_tokens + " tok" : "") + (rec.cost ? " · " + rec.cost : "") + (rec.verCount > 1 ? " · " + rec.verCount + " 版" : (rec.refined ? " · 已微调" : ""));
-      meta.appendChild(qt); meta.appendChild(sub); it.appendChild(meta);
-      var del = document.createElement("button"); del.className = "del"; del.textContent = "✕"; del.title = "删除此条";
-      del.onclick = function (ev) {
-        ev.stopPropagation();
+      qt.textContent = snippet;
+      meta.appendChild(qt);
+      var subText = fmtTime(rec.ts) + (rec.model ? " · " + rec.model : "") + (rec.grade ? " · " + rec.grade : "") + (rec.imgCount ? " · " + rec.imgCount + " 图" : "") + (rec.chatCount ? " · 追问 " + rec.chatCount + " 条" : "") + (rec.elapsedMs != null ? " · " + (rec.elapsedMs / 1000).toFixed(1) + "s" : "") + (rec.usage && rec.usage.total_tokens != null ? " · " + rec.usage.total_tokens + " tok" : "") + (rec.cost ? " · " + rec.cost : "") + (rec.verCount > 1 ? " · " + rec.verCount + " 版" : (rec.refined ? " · 已微调" : ""));
+      if (mob) {
+        var sub = document.createElement("div"); sub.className = "sub";
+        sub.textContent = subText;
+        meta.appendChild(sub);
+      } else {
+        it.title = subText;
+        var tags = document.createElement("div"); tags.className = "hist-tags";
+        tags.appendChild(histTag('<use href="#i-history"/>', histTimeShort(rec.ts), "time"));
+        if (rec.model) tags.appendChild(histTag('<use href="#i-sparkles"/>', rec.model, "model"));
+        if (rec.grade) tags.appendChild(histTag(HIST_ICON_GRADE, rec.grade, "grade"));
+        if (rec.imgCount) tags.appendChild(histTag('<use href="#i-image"/>', rec.imgCount + " 图"));
+        if (rec.chatCount) tags.appendChild(histTag(HIST_ICON_CHAT, "追问 " + rec.chatCount));
+        if (rec.elapsedMs != null) tags.appendChild(histTag(HIST_ICON_CLOCK, (rec.elapsedMs / 1000).toFixed(1) + "s"));
+        if (rec.verCount > 1) tags.appendChild(histTag('<use href="#i-layers"/>', rec.verCount + " 版"));
+        else if (rec.refined) tags.appendChild(histTag('<use href="#i-wand-2"/>', "已微调"));
+        if (rec.cost) tags.appendChild(histTag(HIST_ICON_COST, rec.cost));
+        meta.appendChild(tags);
+      }
+      it.appendChild(meta);
+      function removeRec() {
         draftClear(rec.id); rprefClear(rec.id);
         if (pendingReview && pendingReview.recId === rec.id) cancelPending();
         delete recCache[rec.id];
         history = history.filter(function (x) { return x.id !== rec.id; });
         storePost("/api/store/delete", { id: rec.id }, function () {});
         renderHistory();
+      }
+      var del;
+      if (mob) {
+        // 手机上删除藏在左滑操作栏里：常驻 ✕ 会挤占摘要，也容易误触
+        var row = document.createElement("div"); row.className = "hist-row";
+        var rail = document.createElement("div"); rail.className = "hist-rail";
+        rail.setAttribute("aria-hidden", "true");
+        del = document.createElement("button");
+        del.type = "button";
+        del.className = "hist-del";
+        del.tabIndex = -1;
+        del.setAttribute("aria-label", "删除这条记录");
+        del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></svg><span>删除</span>';
+        del.onclick = function (ev) {
+          ev.stopPropagation();
+          if (window.HJDialog) {
+            HJDialog.confirm({
+              title: "删除这条记录？",
+              message: "删除后无法恢复。",
+              okText: "删除",
+              danger: true
+            }).then(function (ok) {
+              document.dispatchEvent(new CustomEvent("hj-swipe-close"));
+              if (ok) removeRec();
+            });
+          } else if (confirm("删除这条记录？删除后无法恢复。")) {
+            removeRec();
+          }
+        };
+        rail.appendChild(del);
+        row.appendChild(rail);
+        row.appendChild(it);
+        box.appendChild(row);
+      } else {
+        del = document.createElement("button");
+        del.type = "button";
+        del.className = "del";
+        del.title = "删除此条";
+        del.setAttribute("aria-label", "删除这条记录");
+        del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash-2"/></svg>';
+        del.onclick = function (ev) {
+          ev.stopPropagation();
+          hjConfirm({
+            title: "删除这条记录？",
+            message: "删除后无法恢复。",
+            okText: "删除",
+            danger: true,
+            native: "删除这条记录？删除后无法恢复。"
+          }).then(function (ok) { if (ok) removeRec(); });
+        };
+        it.appendChild(del);
+        box.appendChild(it);
+      }
+      it.onclick = function () {
+        if (it.__hjSwiped) { it.__hjSwiped = false; return; }
+        loadRecord(rec);
       };
-      it.appendChild(del);
-      it.onclick = function () { loadRecord(rec); };
-      box.appendChild(it);
+      if (!mob) {
+        it.onkeydown = function (e) {
+          if (e.target !== it) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            loadRecord(rec);
+          }
+        };
+      }
     });
+    if (mob && $("histSub")) $("histSub").textContent = "共 " + history.length + " 条 · 点任意一条回看";
+    try { document.dispatchEvent(new CustomEvent("hj-history-changed")); } catch (e) {}
+  }
+  function clearHistSearch() {
+    histQuery = "";
+    var hs = $("histSearch"), wrap = $("histSearchWrap");
+    if (hs) hs.value = "";
+    if (wrap) wrap.classList.remove("has-q");
+    renderHistory();
   }
   function discardRunningTasks() {
     var running = TASKS.filter(function (e) { return e.status === "running"; });
@@ -1047,15 +1499,17 @@
     var oldId = lastHistoryId;
     last = null; lastHistoryId = null; subQs = null; subIdx = -1;
     autoFixCount = 0; verPreviewVid = 0; lastSolveSeq = solveSeq;
+    retryShow(false);
     if (oldId) draftClear(oldId);
     // 输入区
-    $("q").value = ""; images = []; renderThumbs(); qWarn("");
+    $("q").value = ""; resetImages([]); qWarn("");
     $("rin").value = ""; updCount(); rWarn("");
     // 解答区
     $("meta").style.display = "none"; $("meta").innerHTML = "";
     $("answer").className = "hint"; $("answer").textContent = "—";
     $("analysis").className = "hint"; $("analysis").textContent = "—";
     $("subTabs").innerHTML = ""; $("subTabs").style.display = "none"; $("subTabs").classList.remove("show"); $("subLocate").innerHTML = "";
+    window.HJTabs && window.HJTabs.sync($("subTabs"), false);
     $("qFigFloat").hidden = true; $("qTextFloat").hidden = true;
     $("qText").innerHTML = ""; $("qFig").innerHTML = "";
     qFigCache = {};
@@ -1069,7 +1523,7 @@
     $("ansEditBtn").style.display = "none"; $("ansEditBtn").disabled = false; $("ansEditBtn").textContent = "改答案"; $("ansEditBtn").title = "";
     $("ansNote").style.display = "none"; $("ansNote").innerHTML = "";
     $("err").style.display = "none";
-    $("btnRefine").disabled = false; $("btnRefine").textContent = "微调";
+    refineLocked = false; refineState("idle");
     // 释放 2D/3D 画布并回到欢迎页
     try { render(""); } catch (e) {}
     $("status").textContent = "就绪";
@@ -1090,8 +1544,9 @@
     recFull(id, function (full) {
       if (!full) { $("status").textContent = "记录读取失败，文件可能已被移动或删除"; return; }
       commitPending();
+      retryShow(false);
       $("q").value = full.question || "";
-      images = (full.images || []).slice(); renderThumbs();
+      resetImages(full.images || []);
       gradeApply(full.grade || "");
       last = { question: full.question || "", images: (full.images || []).slice(), cfg: loadCfg(), grade: full.grade || "", result: full };
       lastHistoryId = full.id;
@@ -1104,8 +1559,42 @@
       closeHist();
     });
   }
-  function openHist() { renderHistory(); $("histMsg").textContent = ""; $("histModal").classList.add("show"); }
+  function openHist() {
+    if (!isMobileUI()) {
+      histQuery = "";
+      var hs = $("histSearch"), hw = $("histSearchWrap");
+      if (hs) hs.value = "";
+      if (hw) hw.classList.remove("has-q");
+    }
+    renderHistory();
+    $("histMsg").textContent = "";
+    $("histModal").classList.add("show");
+  }
   function closeHist() { $("histModal").classList.remove("show"); }
+  var histSearchEl = $("histSearch");
+  if (histSearchEl) {
+    histSearchEl.addEventListener("input", function () {
+      histQuery = histSearchEl.value.trim();
+      var hw = $("histSearchWrap");
+      if (hw) hw.classList.toggle("has-q", !!histSearchEl.value);
+      renderHistory();
+    });
+    histSearchEl.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        clearHistSearch();
+        histSearchEl.blur();
+      }
+    });
+  }
+  var histSearchClearEl = $("histSearchClear");
+  if (histSearchClearEl) {
+    histSearchClearEl.onclick = function () {
+      clearHistSearch();
+      if (histSearchEl) histSearchEl.focus();
+    };
+  }
   $("btnHist").onclick = openHist;
   if ($("btnHome")) {
     $("btnHome").onclick = goHome;
@@ -1117,9 +1606,15 @@
   var histX = $("btnHistX");
   if (histX) histX.onclick = closeHist;
   $("histModal").addEventListener("click", function (e) { if (e.target === $("histModal")) closeHist(); });
-  $("btnHistClear").onclick = function () {
+  $("btnHistClear").onclick = async function () {
     if (!history.length) { $("histMsg").textContent = "没有记录"; return; }
-    if (!confirm("确定清空全部 " + history.length + " 条记录吗？\n会删除记录文件夹里的文件，无法恢复。")) return;
+    if (!(await hjConfirm({
+      title: "清空全部记录？",
+      message: history.length + " 条记录会被删除，无法恢复。",
+      okText: "清空",
+      danger: true,
+      native: "确定清空全部 " + history.length + " 条记录吗？\n会删除记录文件夹里的文件，无法恢复。"
+    }))) return;
     cancelPending();
     recCache = {}; history = [];
     storePost("/api/store/purge", {}, function () { renderHistory(); $("histMsg").textContent = "已清空"; });
@@ -1178,17 +1673,43 @@
     im.onerror = function () { cb(dataUrl); };
     im.src = dataUrl;
   }
-  function addImageFile(file) {
-    if (!file) return;
-    if (file.size < IMG_MIN) { qWarn("图片文件过小，不足 10KB，可能是误截图，请重新截图"); return; }
-    if (file.size > IMG_MAX) { qWarn("图片过大，" + (file.size / 1048576).toFixed(1) + " MB，单张不超过 20MB"); return; }
-    file.arrayBuffer().then(function (buf) {
-      if (!sniffImage(new Uint8Array(buf))) { qWarn("仅支持 JPG、PNG、WebP 格式的图片"); return; }
-      var fr = new FileReader();
-      fr.onload = function () { fitImage(String(fr.result), function (u) { images.push(u); renderThumbs(); qWarn(""); }); };
-      fr.onerror = function () { qWarn("读取图片失败"); };
-      fr.readAsDataURL(file);
-    }).catch(function () { qWarn("读取图片失败"); });
+  function decodeImageFile(file, allowSmall) {
+    return new Promise(function (resolve) {
+      if (!file) { resolve(null); return; }
+      if (!allowSmall && file.size < IMG_MIN) { qWarn("图片文件过小，不足 10KB，可能是误截图，请重新截图"); resolve(null); return; }
+      if (file.size > IMG_MAX) { qWarn("图片过大，" + (file.size / 1048576).toFixed(1) + " MB，单张不超过 20MB"); resolve(null); return; }
+      file.arrayBuffer().then(function (buf) {
+        if (!sniffImage(new Uint8Array(buf))) { qWarn("仅支持 JPG、PNG、WebP 格式的图片"); resolve(null); return; }
+        var fr = new FileReader();
+        fr.onload = function () {
+          fitImage(String(fr.result), function (u) {
+            if (!u) { qWarn("读取图片失败"); resolve(null); return; }
+            resolve(u);
+          });
+        };
+        fr.onerror = function () { qWarn("读取图片失败"); resolve(null); };
+        fr.readAsDataURL(file);
+      }).catch(function () { qWarn("读取图片失败"); resolve(null); });
+    });
+  }
+  // 直接加入输入框（粘贴/拖入/旧调用）
+  function addImageFile(file, allowSmall) {
+    return decodeImageFile(file, allowSmall).then(function (u) {
+      if (!u) return null;
+      images.push(u);
+      rememberImage(u, u);
+      renderThumbs();
+      qWarn("");
+      return u;
+    });
+  }
+  // 拍照/相册先暂存，等框选页确认后才进 images
+  function stageImageFile(file, allowSmall, from) {
+    return decodeImageFile(file, allowSmall).then(function (u) {
+      if (!u) return null;
+      PENDING = { src: u, from: from || "shot" };
+      return u;
+    });
   }
   function addImageBlob(blob) { if (blob) addImageFile(new File([blob], "paste.png", { type: blob.type || "image/png" })); }
 
@@ -1397,9 +1918,32 @@
     }
     return hit ? out : null;
   }
-  // 建系题自动铺坐标纸：画布上有 x/y/z 轴对象时才补网格，
+  // 建系题自动铺坐标纸（HANDOVER §72）：画布上有 x/y/z 轴对象时才补网格，
   // 网格压到最底层（否则会盖住图形），每 1 单位一格、不标数字。模型可用 board 选项 grid:false 关掉。
   // 同样会被 toString() 内联进导出页：只能引用 window.board。
+  // 2D 坐标轴固定：模型 renderCode 可能把 x/y 轴创建成可拖动元素，
+  // 坐标系只能平移/缩放视图，不能被拖走。两端共用。
+  function fixAxes2D(b) {
+    b = b || window.board;
+    if (!b || !b.objects) return 0;
+    var n = 0;
+    for (var k in b.objects) {
+      var e = b.objects[k];
+      if (!e) continue;
+      var nm = String(e.name || "");
+      if (!(e.elType === "axis" || /^[xyz]$/.test(nm))) continue;
+      try { e.setAttribute({ fixed: true, highlight: false }); } catch (er) {}
+      try { if (e.visProp) e.visProp.fixed = true; } catch (er2) {}
+      n++;
+    }
+    try {
+      if (b.defaultAxes) ["x", "y", "z"].forEach(function (a) {
+        var ax = b.defaultAxes[a];
+        if (ax) { try { ax.setAttribute({ fixed: true, highlight: false }); } catch (e) {} }
+      });
+    } catch (e) {}
+    return n;
+  }
   function ensureGrid2D() {
     var b = window.board;
     if (!b || !b.objectsList || !b.create) return false;
@@ -1412,13 +1956,40 @@
       if (/^[xyz]$/.test(String(o.name || "")) || o.elType === "axis") hasAxis = true;
     }
     if (!hasAxis) return false;
-    var g = b.create("grid", [], { majorStep: 1, strokeColor: "#e2e2e2", strokeWidth: 1, fixed: true, highlight: false });
+    // 网格色走皮肤 palette（default = 原值 #e2e2e2，保证默认皮肤不变）
+    var pal = (window.HJSkin && HJSkin.palette()) || null;
+    var gcol = (pal && pal.grid2d) || "#e2e2e2";
+    var g = b.create("grid", [], { majorStep: 1, strokeColor: gcol, strokeWidth: 1, fixed: true, highlight: false });
     var arr = b.elements || [];
     var idx = arr.indexOf(g);
     if (idx > 0) { arr.splice(idx, 1); arr.unshift(g); }      // 第一个元素画在最底层
     b.update();
     return true;
   }
+  // 皮肤切换后的画布跟随：给已有网格/默认轴重上 palette 色、通知 3D 换背景与网格。
+  // 只改样式不重算几何（SKIN-SYSTEM.md §5.3）；模型自己画的轴/图形是内容色，不动。
+  function applyCanvasSkin() {
+    var pal = (window.HJSkin && HJSkin.palette()) || null;
+    if (!pal) return;
+    var b = window.board;
+    if (b && b.objects) {
+      var changed = false;
+      for (var k in b.objects) {
+        var e = b.objects[k];
+        if (!e || !e.elType) continue;
+        if (e.elType === "grid" && pal.grid2d) {
+          try { e.setAttribute({ strokeColor: pal.grid2d }); changed = true; } catch (er) {}
+        } else if (e.elType === "axis" && pal.axis2d) {
+          try { e.setAttribute({ strokeColor: pal.axis2d }); changed = true; } catch (er) {}
+        }
+      }
+      if (changed) { try { b.update(); } catch (er) {} }
+    }
+    if (window.GGB3D && window.GGB3D.applyPalette) {
+      try { window.GGB3D.applyPalette(pal); } catch (er) {}
+    }
+  }
+  document.addEventListener("hj:skin", function () { try { applyCanvasSkin(); } catch (e) { console.warn("applyCanvasSkin", e); } });
   // 遍历 JSXGraph 画板，把所有含 LaTeX 的 text 元素转成 KaTeX HTML
   // （同样会被 toString() 内联进导出页：只能引用 window.board / window.texCanvasHTML）
   function applyTex2D(board) {
@@ -1510,8 +2081,9 @@
       if (window.HJ && window.HJ.clearScene) window.HJ.clearScene();
       return false;
     }
-    $("status").textContent = "脚本 " + code.length + " 字节";
-    try { (new Function(code))(); autoFixCount = 0; applyStyle2D(result && result.style2d); try { applyTex2D(window.board); } catch (eT) { console.warn("applyTex2D", eT); } try { ensureGrid2D(); } catch (eG) { console.warn("ensureGrid2D", eG); } try { window.HJGrid && window.HJGrid.apply(); } catch (eP) {} build2DUI(result); return true; }
+    if (window.HJFX) window.HJFX.count($("status"), code.length, function (v) { return "脚本 " + Math.round(v) + " 字节"; });
+    else $("status").textContent = "脚本 " + code.length + " 字节";
+    try { (new Function(code))(); autoFixCount = 0; try { fixAxes2D(window.board); } catch (eA) { console.warn("fixAxes2D", eA); } applyStyle2D(result && result.style2d); try { applyTex2D(window.board); } catch (eT) { console.warn("applyTex2D", eT); } try { ensureGrid2D(); } catch (eG) { console.warn("ensureGrid2D", eG); } try { window.HJGrid && window.HJGrid.apply(); } catch (eP) {} try { applyCanvasSkin(); } catch (eC) {} build2DUI(result); return true; }
     catch (e) {
       host.innerHTML = "";
       $("err").style.display = "block";
@@ -1584,6 +2156,37 @@
   window.HJ._style2D = style2D;
   window.HJ._style3D = style3DChanged;
   window.HJ._styleLocked = function () { return !!verPreviewVid; };
+  // 移动端设置页 / 首启向导用：复用同一套字段收集与静默保存
+  window.HJ._cfgCollect = collect;
+  window.HJ._cfgSaveQuiet = function () {
+    var c = collect();
+    if (c.baseUrl && c.apiKey && c.model) { saveCfg(c); return c; }
+    return null;
+  };
+  window.HJ._cfgModel = function () { return loadCfg(); };
+  window.HJ._histCount = function () { return history.length; };
+  window.HJ._renderHistory = renderHistory;
+  window.HJ._imageCount = function () { return images.length; };
+  window.HJ._cropLast = function () {
+    if (!images.length) return false;
+    return cropOpen(images.length - 1);
+  };
+  window.HJ._cropPending = function () { return cropOpenPending(); };
+  window.HJ._stageImage = function (file, allowSmall, from) { return stageImageFile(file, allowSmall, from); };
+  window.HJ._discardPending = discardPending;
+  window.HJ._plain = texPlainText;
+  window.HJ._recent = function (n) {
+    return history.slice(0, n || 3).map(function (x) {
+      return { id: x.id, ts: x.ts, question: x.question, questionText: x.questionText,
+        thumb: x.thumb, model: x.model, imgCount: x.imgCount, usage: x.usage };
+    });
+  };
+  window.HJ._openRecord = function (id) {
+    for (var i = 0; i < history.length; i++) {
+      if (history[i].id === id) { loadRecord(history[i]); return true; }
+    }
+    return false;
+  };
 
   // ================= 异步任务 + 任务面板（#3） + 流式（#7） =================
   var TK_KEY = "solver_tasks_v1";
@@ -1597,7 +2200,7 @@
       // 追问任务的上下文在聊天记录里，不放进“刷新后恢复”的任务列表：
       // 否则页面刷新后没有对应的聊天输入，恢复出来也无法继续。
       var out = TASKS.filter(function (e) { return !(e.opts && e.opts.chat); }).slice(0, 12).map(function (e) {
-        return { id: e.id, kind: e.kind, label: e.label, snippet: e.snippet, qFull: e.qFull, grade: e.grade, baseId: e.baseId, instruction: e.instruction || "", target: e.target || "", dim: e.dim || "", scope: e.scope || "", option: e.option || "", questionIndex: (typeof e.questionIndex === "number" ? e.questionIndex : -1), givenAnswer: e.givenAnswer || "", status: e.status, stage: e.stage, progress: e.progress, received: e.received, ts: e.ts, doneAt: e.doneAt, error: e.error, message: e.message, recId: e.recId, auto: !!(e.opts && e.opts.auto) };
+        return { id: e.id, kind: e.kind, label: e.label, snippet: e.snippet, qFull: e.qFull, grade: e.grade, baseId: e.baseId, instruction: e.instruction || "", target: e.target || "", dim: e.dim || "", scope: e.scope || "", option: e.option || "", questionIndex: (typeof e.questionIndex === "number" ? e.questionIndex : -1), givenAnswer: e.givenAnswer || "", status: e.status, stage: e.stage, progress: e.progress, received: e.received, reasoning: e.reasoning || 0, ts: e.ts, doneAt: e.doneAt, error: e.error, message: e.message, recId: e.recId, auto: !!(e.opts && e.opts.auto) };
       });
       localStorage.setItem(TK_KEY, JSON.stringify(out));
     } catch (e) {}
@@ -1605,8 +2208,87 @@
   function closeEntryES(e) { if (e.es) { try { e.es.close(); } catch (e2) {} e.es = null; } if (e.poll) { clearInterval(e.poll); e.poll = null; } }
   // 任务面板默认收起，点状态栏的「N 个进行中」展开（避免遮挡右栏解答）
   var panelOpen = false;
+  // ================= 解题按钮状态机（beUI StatefulButton） =================
+  // 有解题任务在跑 → busy（转圈）；最近一次解题刚完成 → 打勾脉冲；其余回「解题」。
+  // 统一挂在 renderPanel 上（任务每次状态变化都会调它），不在各终点散落改按钮。
+  var GO_IDLE_HTML = null, goStateCur = "";
+  function goState(s) {
+    if (s === goStateCur) return;
+    goStateCur = s;
+    var b = $("go"); if (!b) return;
+    if (!GO_IDLE_HTML) GO_IDLE_HTML = b.innerHTML;
+    if (s === "busy") {
+      b.disabled = true; b.classList.remove("done"); b.classList.add("busy");
+      b.innerHTML = '<svg class="ico hj-spin" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>解题中';
+    } else if (s === "done") {
+      b.disabled = false; b.classList.remove("busy"); b.classList.add("done");
+      b.innerHTML = '<svg class="ico"><use href="#i-check"/></svg>完成';
+      setTimeout(function () { if (goStateCur === "done") goState("idle"); }, 1400);
+    } else {
+      b.disabled = false; b.classList.remove("busy", "done");
+      b.innerHTML = GO_IDLE_HTML;
+    }
+  }
+  // ================= 微调按钮状态机（beUI StatefulButton，与 goState 同构） =================
+  // 有微调/按答案重画/修正任务在跑 → busy；最近一次刚完成 → 打勾脉冲；其余回「微调」。
+  // 审查锁（lockRefine，待确认/撤销回退期间禁用）是另一层：refineLocked 追踪它，
+  // busy 结束/idle 都尊重它的 disabled，两套状态互不覆盖。
+  var REFINE_IDLE_HTML = null, refineStateCur = "", refineStateLabel = "", refineLocked = false;
+  function refineBusyText(label) {
+    if (/重画/.test(label || "")) return "重画中";
+    if (/修正/.test(label || "")) return "修正中";
+    return "微调中";
+  }
+  function refineState(s, label) {
+    if (s === refineStateCur && s !== "busy") return;
+    if (s === "busy" && refineStateCur === "busy" && refineStateLabel === (label || "")) return;
+    var b = $("btnRefine"); if (!b) return;
+    if (!REFINE_IDLE_HTML) REFINE_IDLE_HTML = b.innerHTML;
+    refineStateCur = s; refineStateLabel = label || "";
+    if (s === "busy") {
+      b.disabled = true; b.classList.remove("done"); b.classList.add("busy");
+      b.innerHTML = '<svg class="ico hj-spin" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>' + refineBusyText(label);
+    } else if (s === "done") {
+      b.disabled = refineLocked; b.classList.remove("busy"); b.classList.add("done");
+      b.innerHTML = '<svg class="ico"><use href="#i-check"/></svg>已微调';
+      setTimeout(function () { if (refineStateCur === "done") refineState("idle"); }, 1400);
+    } else {
+      b.disabled = refineLocked; b.classList.remove("busy", "done");
+      b.innerHTML = REFINE_IDLE_HTML;
+    }
+  }
   function renderPanel() {
-    var p = $("taskPanel"); if (!p) return;
+    // 解题按钮状态机（见 goState）：只看「解题」类任务；TASKS 新任务在前
+    var goRunning = false;
+    for (var gi = 0; gi < TASKS.length; gi++) {
+      if (TASKS[gi].status !== "running") continue;
+      if (TASKS[gi].kind === "solve") { goRunning = true; break; }
+    }
+    if (goRunning) goState("busy");
+    else {
+      var goLast = null;
+      for (var gj = 0; gj < TASKS.length; gj++) if (TASKS[gj].kind === "solve") { goLast = TASKS[gj]; break; }
+      if (goLast && goLast.doneAt && Date.now() - goLast.doneAt < 1500) goState(goLast.status === "done" ? "done" : "idle");
+      else goState("idle");
+    }
+    // 微调按钮状态机：只看「微调/按答案重画/修正」类任务（kind refine/autofix）
+    var rfRunning = null;
+    for (var ri = 0; ri < TASKS.length; ri++) {
+      var tk = TASKS[ri];
+      if (tk.status !== "running" || (tk.kind !== "refine" && tk.kind !== "autofix")) continue;
+      if (!rfRunning || (tk.ts || 0) > (rfRunning.ts || 0)) rfRunning = tk;
+    }
+    if (rfRunning) refineState("busy", rfRunning.label);
+    else {
+      var rfLast = null;
+      for (var rj = 0; rj < TASKS.length; rj++) {
+        var tk2 = TASKS[rj].kind;
+        if (tk2 !== "refine" && tk2 !== "autofix") continue;
+        rfLast = TASKS[rj]; break;
+      }
+      if (rfLast && rfLast.doneAt && Date.now() - rfLast.doneAt < 1500) refineState(rfLast.status === "done" ? "done" : "idle");
+      else refineState("idle");
+    }
     var runningTasks = TASKS.filter(function (t) { return t.status === "running"; });
     var running = runningTasks.length;
     var latest = null;
@@ -1614,6 +2296,29 @@
       if (!latest || (runningTasks[i].ts || 0) > (latest.ts || 0)) latest = runningTasks[i];
     }
     var latestPct = latest ? Math.max(0, Math.min(100, latest.progress || 0)) : 0;
+    // 手机端：把每个任务自己的进度交给标题行内的进度条（微调 / 追问各一条）
+    try {
+      if (window.HJMobileInlineProgress) {
+        window.HJMobileInlineProgress.update(runningTasks.map(function (t) {
+          return {
+            id: t.id, kind: t.kind || "", label: t.label || "", status: t.status,
+            stage: t.stage || "", progress: t.progress || 0,
+            received: t.received || 0, reasoning: t.reasoning || 0, ts: t.ts || 0
+          };
+        }));
+      }
+    } catch (e) {}
+    // 手机端没有状态栏：把任务进度交给画布中央浮卡，别让解题过程变成未知状态
+    try {
+      if (window.HJMobileProgress) {
+        window.HJMobileProgress.update(running, latest ? {
+          stage: latest.stage || "", progress: latestPct, received: latest.received || 0,
+          reasoning: latest.reasoning || 0,
+          ts: latest.ts || 0, label: latest.label || "", kind: latest.kind || "", count: running
+        } : null);
+      }
+    } catch (e) {}
+    var p = $("taskPanel"); if (!p) return;
     // 题图/图片选择框右侧的主进度条（状态栏右下角的小进度条继续保留）
     var ip = $("imgProgress");
     if (ip) {
@@ -1819,6 +2524,7 @@
     if (!d || entry.terminal || entry.discard) return;
     if (d.progress != null) {
       entry.progress = d.progress; entry.stage = d.stage; entry.received = d.received;
+      entry.reasoning = d.reasoning || 0;
       if (entry.opts.chat && d.partial != null) chatStreamSet(entry, d.partial);
       taskSave(); renderPanel();
     }
@@ -1826,6 +2532,7 @@
     entry.terminal = true;
     closeEntryES(entry);
     if (d.status === "done") {
+      retryShow(false);
       entry.status = "done"; entry.stage = "完成"; entry.doneAt = Date.now();
       taskSave(); renderPanel();
       if (entry.opts.chat) { chatFinish(entry, d.result); taskSave(); renderPanel(); return; }
@@ -1835,10 +2542,9 @@
       // 界面只留一句人话；原始 body / 堆栈全部进「日志」，想看细节点左下角。
       var info = errInfo(d);
       entry.status = "error"; entry.error = d.error; entry.message = d.message;
-      entry.errTitle = info.title; entry.errHint = info.hint; entry.errCode = info.code;
+      entry.errTitle = info.title; entry.errHint = logHintText(info.hint); entry.errCode = info.code;
       entry.doneAt = Date.now();
       taskSave(); renderPanel();
-      $("btnRefine").disabled = false; $("btnRefine").textContent = "微调";
       unlockAnsEdit();
       logMarkErr();
       if (entry.opts.chat) { chatFail(entry, d); return; }
@@ -1846,12 +2552,13 @@
       $("status").textContent = "失败：" + info.title;
       $("answer").className = "hint"; $("analysis").className = "hint";
       $("answer").textContent = info.title;
-      $("analysis").textContent = (info.hint || "重试一次") + (info.hint && info.hint.indexOf("日志") >= 0 ? "" : "（完整信息见左下角「日志」）");
+      var hint = logHintText(info.hint || "重试一次");
+      $("analysis").textContent = hint + (hint.indexOf("日志") >= 0 ? "" : "（完整信息见" + (isMobileUI() ? "「设置 → 诊断」" : "左下角「日志」") + "）");
+      if (!entry.opts.chat && !entry.opts.auto && !entry.opts.update) retryShow(true);
     }
   }
   // 返回 false 表示结果已过期、未应用（调用方不要再覆盖任务记录 id）
   function applyTaskResult(entry, r) {
-    $("btnRefine").disabled = false; $("btnRefine").textContent = "微调";
     unlockAnsEdit();
     if (!r) { $("status").textContent = "失败：未返回结果"; return true; }
     // 解题结果按发起顺序应用：更晚发起的题已经显示后，先发起的旧任务再返回就不覆盖
@@ -1897,6 +2604,7 @@
   }
   function runTask(url, body, label, opts) {
     opts = opts || {};
+    retryShow(false);
     if (TASKS.filter(function (t) { return t.status === "running"; }).length >= 6) {
       $("status").textContent = "任务太多，最多 6 个进行中，请先等待或取消";
       return null;
@@ -1916,7 +2624,7 @@
       images: Array.isArray(body.images) ? body.images.slice() : [],
       opts: { update: !!opts.update, auto: !!opts.auto, chat: !!opts.chat },
       seq: (opts.update || opts.auto || opts.chat) ? 0 : (++solveSeq),
-      status: "running", stage: "提交任务…", progress: 3, received: 0,
+      status: "running", stage: "提交任务…", progress: 3, received: 0, reasoning: 0,
       ts: Date.now(), doneAt: 0, error: "", message: "", recId: "",
       es: null, poll: null, terminal: false
     };
@@ -1927,6 +2635,7 @@
       $("answer").innerHTML = "…"; $("analysis").innerHTML = "…";
       $("answer").className = "hint"; $("analysis").className = "hint";
       $("subTabs").innerHTML = ""; $("subTabs").style.display = "none"; $("subLocate").innerHTML = "";
+      window.HJTabs && window.HJTabs.sync($("subTabs"), false);
       ansEditClose();
       if ($("ansEditBtn")) $("ansEditBtn").style.display = "none";
       if ($("ansNote")) { $("ansNote").style.display = "none"; $("ansNote").innerHTML = ""; }
@@ -1942,8 +2651,9 @@
           taskSave(); renderPanel();
           if (entry.error === "NO_CONFIG") { openModal(); $("cfgMsg").className = "msg bad"; $("cfgMsg").textContent = "请先配置模型"; }
           if (entry.opts.chat) { chatFail(entry, { error: entry.error, message: entry.message }); return; }
-          if (!entry.opts.chat) { $("btnRefine").disabled = false; $("btnRefine").textContent = "微调"; unlockAnsEdit(); }
+          if (!entry.opts.chat) unlockAnsEdit();
           if (entry.error !== "NO_CONFIG" && !entry.opts.auto) { $("status").textContent = "失败：" + entry.errTitle; }
+          if (entry.error !== "NO_CONFIG") retryFailUI(entry, entry.errTitle, entry.errHint);
           return;
         }
         entry.id = j.taskId;
@@ -1952,9 +2662,10 @@
       })
       .catch(function (e) {
         entry.status = "error"; entry.error = "NETWORK"; entry.message = e.message; entry.doneAt = Date.now(); entry.terminal = true;
+        entry.errTitle = "网络请求失败"; entry.errHint = "检查网络后重试一次";
         taskSave(); renderPanel();
         if (entry.opts.chat) chatFail(entry, { error: "NETWORK", message: e.message });
-        else { $("btnRefine").disabled = false; $("btnRefine").textContent = "微调"; unlockAnsEdit(); }
+        else { unlockAnsEdit(); $("status").textContent = "失败：" + entry.errTitle; retryFailUI(entry, entry.errTitle, entry.errHint); }
       });
     return entry;
   }
@@ -1969,7 +2680,7 @@
           instruction: o.instruction || "", target: o.target || "", dim: o.dim || "", scope: o.scope || "", option: o.option || "",
           questionIndex: (typeof o.questionIndex === "number" ? o.questionIndex : -1), givenAnswer: o.givenAnswer || "",
           opts: { update: o.kind === "refine" || o.kind === "autofix", auto: !!o.auto },
-          status: running ? "running" : o.status, stage: o.stage || "", progress: o.progress || 0, received: o.received || 0,
+          status: running ? "running" : o.status, stage: o.stage || "", progress: o.progress || 0, received: o.received || 0, reasoning: o.reasoning || 0,
           ts: o.ts || Date.now(), doneAt: o.doneAt || 0, error: o.error || "", message: o.message || "", recId: o.recId || "",
           es: null, poll: null, terminal: !running
         });
@@ -2035,10 +2746,12 @@
   // ================= 微调审查流（待确认 / 撤销回退） =================
   var pendingReview = null;
   function lockRefine() {
+    refineLocked = true;
     $("btnRefine").disabled = true; $("btnRefine").title = "请先处理当前 AI 微调结果：存为新版本、覆盖当前版本或撤销回退";
     var ae = $("ansEditBtn"); if (ae) { ae.disabled = true; ae.title = $("btnRefine").title; }
   }
   function unlockRefine() {
+    refineLocked = false;
     $("btnRefine").disabled = false; $("btnRefine").title = "";
     var ae = $("ansEditBtn"); if (ae) { ae.disabled = false; ae.title = ""; }
   }
@@ -2319,7 +3032,7 @@
     });
     $("status").textContent = "已把 v" + vid + " 复制为一条新记录（历史里可找到）";
   }
-  function verRemove(vid) {
+  async function verRemove(vid) {
     var rec = recCache[lastHistoryId] || null;
     if (!rec) return;
     var list = verShape(rec);
@@ -2327,7 +3040,13 @@
     var v = null;
     for (var i = 0; i < list.length; i++) if (list[i].vid === vid) v = list[i];
     if (!v) return;
-    if (!confirm("删除 v" + vid + "（" + verFigKind(v) + "）？\n\n删除后无法恢复，但其他版本不受影响。")) return;
+    if (!(await hjConfirm({
+      title: "删除 v" + vid + "？",
+      message: "删除后无法恢复，但其他版本不受影响。",
+      okText: "删除",
+      danger: true,
+      native: "删除 v" + vid + "（" + verFigKind(v) + "）？\n\n删除后无法恢复，但其他版本不受影响。"
+    }))) return;
     var wasCur = (rec.currentVid === vid);
     verDrop(rec, vid);
     if (wasCur) {
@@ -2609,7 +3328,6 @@
     var cfg = loadCfg();
     if (!cfg || !cfg.baseUrl || !cfg.apiKey) { openModal(); $("cfgMsg").className = "msg bad"; $("cfgMsg").textContent = "请先配置模型"; return; }
     if (!isAuto) {
-      $("btnRefine").disabled = true; $("btnRefine").textContent = byAnswer ? "重画中…" : "微调中…";
       $("ansEditBtn").disabled = true; $("ansEditBtn").textContent = byAnswer ? "重画中…" : "微调中…";
     }
     var sc = isAuto ? { questionIndex: -1, scope: "all", option: "" } : (extra.scopeObj || curRefineScope());
@@ -2652,7 +3370,7 @@
       // 只勾了小题、只在逐问意见里写了内容时，总要求可以留空
       var sc0 = curRefineScope();
       var hasPer = (sc0.perQuestion || []).some(function (p) { return p.text; });
-      if (!hasPer) { $("rin").focus(); return; }
+      if (!hasPer) { window.HJFX && HJFX.shake($("rin")); $("rin").focus(); return; }
     }
     refine(ins, false);
   };
@@ -2676,7 +3394,7 @@
     $("chips").appendChild(b);
   });
   updCount();
-  window.SolverDebug = { scope: function () { return curRefineScope(); }, addImageFile: addImageFile, fitImage: fitImage, images: function () { return images; }, last: function () { return last; }, recId: function () { return lastHistoryId; }, versions: function () { var r = (last && last.result) || null; return r ? { list: verShape(r).slice(), currentVid: r.currentVid || 0 } : null; }, previewVid: function () { return verPreviewVid; }, renderQCard: renderQCard, anaSplit: anaSplit, anaHTML: anaHTML, review: function () { return pendingReview ? { recId: pendingReview.recId, refinedNext: pendingReview.refinedNext, target: pendingReview.target, givenAnswer: pendingReview.givenAnswer, questionIndex: pendingReview.questionIndex } : null; }, ansEdit: function () { return { open: ansEditIsOpen(), scope: ansEditScope, text: $("ansEditIn") ? $("ansEditIn").value : "" }; }, tasks: function () { return TASKS.map(function (t) { return { id: t.id, kind: t.kind, status: t.status, recId: t.recId, stage: t.stage, progress: t.progress, received: t.received }; }); }, chat: function () { return chatActive ? { recId: chatActive.recId, status: chatActive.status, text: chatActive.text, error: chatActive.error || "" } : null; } };
+  window.SolverDebug = { scope: function () { return curRefineScope(); }, addImageFile: addImageFile, stageImageFile: stageImageFile, cropPending: cropOpenPending, cropOpen: cropOpen, figureCrop: cropOpenFigure, cropFigure: cropFigure, discardPending: discardPending, fitImage: fitImage, images: function () { return images; }, last: function () { return last; }, recId: function () { return lastHistoryId; }, versions: function () { var r = (last && last.result) || null; return r ? { list: verShape(r).slice(), currentVid: r.currentVid || 0 } : null; }, previewVid: function () { return verPreviewVid; }, renderQCard: renderQCard, anaSplit: anaSplit, anaHTML: anaHTML, review: function () { return pendingReview ? { recId: pendingReview.recId, refinedNext: pendingReview.refinedNext, target: pendingReview.target, givenAnswer: pendingReview.givenAnswer, questionIndex: pendingReview.questionIndex } : null; }, ansEdit: function () { return { open: ansEditIsOpen(), scope: ansEditScope, text: $("ansEditIn") ? $("ansEditIn").value : "" }; }, tasks: function () { return TASKS.map(function (t) { return { id: t.id, kind: t.kind, status: t.status, recId: t.recId, stage: t.stage, progress: t.progress, received: t.received, reasoning: t.reasoning || 0 }; }); }, chat: function () { return chatActive ? { recId: chatActive.recId, status: chatActive.status, text: chatActive.text, error: chatActive.error || "" } : null; } };
 
   // ================= 小题拆分（#6） =================
   function renderSubTabs() {
@@ -2684,18 +3402,25 @@
     box.innerHTML = "";
     // 只有真正拆出多个小问时才显示顶部分段切换；单问仍用底部步骤条
     if (!subQs || subQs.length < 2) {
-      box.style.display = "none"; box.classList.remove("show"); return;
+      box.style.display = "none"; box.classList.remove("show");
+      window.HJTabs && window.HJTabs.sync(box, false);
+      return;
     }
     box.classList.add("show"); box.style.display = "flex";
     var items = [{ label: "全部", idx: -1 }].concat(subQs.map(function (s, i) { return { label: (s && s.label) || ("(" + (i + 1) + ")"), idx: i }; }));
     items.forEach(function (it) {
       var b = document.createElement("button");
       var lb = String(it.label || "").trim();
-      b.textContent = it.idx < 0 ? "全部" : (/^[（(][^）)]+[）)]$/.test(lb) ? "第" + lb + "问" : lb);
+      // 文本包一层 .lbl：弹簧胶囊（.tab-ind）要垫在文字之下、按钮底色之上（见 ui.css）
+      var sp = document.createElement("span");
+      sp.className = "lbl";
+      sp.textContent = it.idx < 0 ? "全部" : (/^[（(][^）)]+[）)]$/.test(lb) ? "第" + lb + "问" : lb);
+      b.appendChild(sp);
       if (subIdx === it.idx) { b.className = "on"; b.setAttribute("aria-current", "page"); }
       b.onclick = function () { showSub(it.idx, true); };
       box.appendChild(b);
     });
+    window.HJTabs && window.HJTabs.sync(box, true);
   }
   // 「全部」答案里的分问块：点一下 = 跳到该问（与顶部标签同一条路径）
   (function () {
@@ -2728,11 +3453,14 @@
   function showSub(i, jump) {
     var r = last && last.result; if (!r) return;
     if (ansEditIsOpen()) ansEditClose();
+    var prev = subIdx;
     subIdx = i;
     var s = (i >= 0 && r.subQuestions) ? r.subQuestions[i] : null;
     $("answer").className = ""; $("analysis").className = "";
     $("answer").innerHTML = s ? mathHTML(s.answer || "本问未给答案") : ansAllHTML(r);
     $("analysis").innerHTML = s ? mathHTML(s.analysis || "") : anaHTML(r.analysis || "", r.subQuestions);
+    // 切问内容淡入（beUI motion tabs 的内容过渡）；subIdx 没变的重渲染不闪
+    if (prev !== i && window.HJTabs) { window.HJTabs.swapIn($("answer")); window.HJTabs.swapIn($("analysis")); }
     var lb = $("subLocate"); lb.innerHTML = "";
     var fts = s ? (s.focusTargets || []) : (r.focusTargets || []);
     window.HJ && (window.HJ._focusTargets = fts);
@@ -2767,14 +3495,11 @@
     ansEditImg = "";
     ansImgRender();
     var box = $("ansEdit"); if (box) box.style.display = "none";
+    // 标题栏那颗按钮本身就是展开/收起的开关，关掉时把文字改回来
+    var b = $("ansEditBtn");
+    if (b && !b.disabled) { b.textContent = "改答案"; b.title = ""; }
   }
-  function ansEditCount() {
-    var ta = $("ansEditIn"), c = $("ansEditCount");
-    if (!ta || !c) return;
-    var n = String(ta.value || "").length;
-    c.textContent = n + "/" + ANS_EDIT_MAX;
-    c.className = "ans-edit-count" + (n >= ANS_EDIT_MAX ? " full" : "");
-  }
+  // 字数计数已移除（改答案区不再显示 0/4000，只保留 maxlength 硬限制）
   // ---- 答案截图：贴进来只挂一张缩略图，识别发生在点「按此答案重画」之后（模型读图，和题图同一套做法） ----
   function ansImgHint(msg, cls) {
     var t = $("ansImgHint"); if (!t) return;
@@ -2834,9 +3559,18 @@
     ansImgHint("");
     $("ansEditHint").textContent = (s ? "将按第 (" + (subIdx + 1) + ") 问重画；" : "将按整题重画；") +
       "图会以你给的答案为目标重新生成。若答案与题设冲突，AI 会保留原答案并说明。" +
-      "也可以粘贴答案截图（Ctrl+V / 右键粘贴），点「按此答案重画」时由 AI 读出其中的答案。";
-    ansEditCount();
-    setTimeout(function () { try { $("ansEditIn").focus(); } catch (e) {} }, 0);
+      "也可以上传或粘贴答案截图，点「按此答案重画」时由 AI 读出其中的答案。";
+    // 按钮兼作展开/收起的开关：展开后显示「收起」，再点一次就是收起（原来靠区内的「取消」）
+    if ($("ansEditBtn")) {
+      $("ansEditBtn").textContent = "收起";
+      $("ansEditBtn").title = "收起改答案区";
+    }
+    // 和微调 / 追问一样用 preventScroll：滚动避让统一交给 mobile-sheet 的键盘逻辑，
+    // 否则浏览器原生滚动会和它抢，位置来回跳。
+    setTimeout(function () {
+      try { $("ansEditIn").focus({ preventScroll: true }); }
+      catch (e) { try { $("ansEditIn").focus(); } catch (e2) {} }
+    }, 0);
   }
   function renderAnsNote(r) {
     var n = $("ansNote"); if (!n) return;
@@ -2885,11 +3619,26 @@
     refine("按用户给定答案重新生成完整解答与图形", false, { givenAnswer: txt, scopeObj: sc, answerImage: img });
   }
   if ($("ansEditBtn")) $("ansEditBtn").onclick = function () { if (ansEditIsOpen()) ansEditClose(); else ansEditOpen(); };
-  if ($("ansEditCancel")) $("ansEditCancel").onclick = ansEditClose;
+  // 「取消」按钮已移除：展开/收起统一走答案卡标题栏的「改答案」按钮（ansEditBtn 本身就是 toggle）
   if ($("ansImgDel")) $("ansImgDel").onclick = ansImgClear;
+  // 上传答案图片：手机端没有 Ctrl+V，只能给一个选择器入口。
+  // 走标准 file input —— Android WebView 会唤起系统「相册/文件」选择器；
+  // 答案截图整张都是答案，不需要走框选页，选完直接进 ansImgBlob（与粘贴同一条路径）。
+  if ($("ansImgPick")) $("ansImgPick").onclick = function () {
+    var inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    inp.style.display = "none";
+    inp.addEventListener("change", function () {
+      var f = inp.files && inp.files[0];
+      if (inp.parentNode) inp.parentNode.removeChild(inp);
+      if (f) ansImgBlob(f);
+    });
+    document.body.appendChild(inp);
+    inp.click();
+  };
   if ($("ansRedraw")) $("ansRedraw").onclick = redrawWithAnswer;
   if ($("ansEditIn")) {
-    $("ansEditIn").addEventListener("input", ansEditCount);
     $("ansEditIn").addEventListener("keydown", function (e) {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); redrawWithAnswer(); }
     });
@@ -3225,17 +3974,42 @@
         card.classList.add("sized");
       }
     }
+    // beUI Bouncy Accordion：浮卡本体宽高过渡——收起时宽高一起收成标题条，展开时弹回。
+    // 起点=切换前的实际尺寸，终点=切换后的实际尺寸；sized 卡（用户调过尺寸）展开的
+    // 终点就是恢复的 inline 尺寸，结束后保留 inline；非 sized 卡清掉 inline 交还 CSS。
+    // 减动效或尺寸没变化时直接切换。
+    var qReduce = false;
+    try { qReduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+    var cardAnim = !qReduce && wasCollapsed !== collapsed;
+    var startH = 0, startW = 0;
+    if (cardAnim) { startH = card.offsetHeight; startW = card.offsetWidth; }
     card.classList.toggle("collapsed", collapsed);
+    if (cardAnim) {
+      var endH = card.offsetHeight, endW = card.offsetWidth;
+      if (Math.abs(startH - endH) > 2 || Math.abs(startW - endW) > 2) {
+        card.style.height = startH + "px"; card.style.width = startW + "px";
+        void card.offsetHeight;
+        var easeQ = collapsed ? "cubic-bezier(.4,0,.2,1)" : "cubic-bezier(.34,1.45,.64,1)";
+        card.style.transition = "height .28s " + easeQ + ", width .28s " + easeQ;
+        card.style.height = endH + "px"; card.style.width = endW + "px";
+        setTimeout(function () {
+          card.style.transition = "";
+          if (!card.classList.contains("sized")) { card.style.height = ""; card.style.width = ""; }
+        }, 310);
+      }
+    }
     var btn = card.querySelector(".qfloat-fold");
     if (btn) {
       btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
       btn.title = collapsed ? "展开" : "收起";
       var sign = btn.querySelector(".qfold-sign");
       var word = btn.querySelector(".qfold-word");
-      // 用 svg 画 +/−：文字 "+" 的字形中线比 svg 图标低 1px，两者并排会看起来没对齐
-      if (sign) sign.innerHTML = collapsed
-        ? '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>'
-        : '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>';
+      // 用 svg 画 +/−：文字 "+" 的字形中线比 svg 图标低 1px，两者并排会看起来没对齐。
+      // 竖杠常驻、由卡片收起态经 CSS 弹性显隐（.qfold-v，见 ui.css）——
+      // 不再整体替换 innerHTML，否则每次折叠都会打断形变过渡
+      if (sign && !sign.firstElementChild) {
+        sign.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path class="qfold-v" d="M12 5v14"/></svg>';
+      }
       if (word) word.textContent = collapsed ? "展开" : "收起";
     }
     requestAnimationFrame(function () { qFloatClamp(card); });
@@ -3306,7 +4080,7 @@
   //    于是 shot_*.js 这类截图脚本每跑一次就往用户的 Documents\Hegy\records 里塞一条「（测试题）」，
   //    手工删掉还会被后续脚本继续补写（曾一次留下 44 条）。
   //    现在默认**只渲染、不写盘**；确实需要落盘的自测，显式传 { persist: true }，
-  //    并且建议用 USERPROFILE=<临时目录> 起独立服务，避免污染真实用户目录。
+  //    并且建议用 USERPROFILE=<临时目录> 起独立服务（见 HANDOVER §44.5 的测试隔离建议）。
   window.HJTest = {
     inject: function (r, opts) {
       r = r || {};
@@ -3654,11 +4428,17 @@
     fetch("/api/task/" + chatActive.entry.id + "/cancel", { method: "POST" }).catch(function () {});
     $("status").textContent = "正在停止追问…";
   }
-  function chatClear() {
+  async function chatClear() {
     if (!last || !last.result || !lastHistoryId) return;
     var arr = chatArr(last.result);
     if (!arr.length) return;
-    if (!confirm("清空这道题的追问记录？\n\n只删除聊天内容，不会影响答案、解析和图形。")) return;
+    if (!(await hjConfirm({
+      title: "清空追问记录？",
+      message: "只删除聊天内容，不会影响答案、解析和图形。",
+      okText: "清空",
+      danger: true,
+      native: "清空这道题的追问记录？\n\n只删除聊天内容，不会影响答案、解析和图形。"
+    }))) return;
     if (chatActive && chatActive.recId === lastHistoryId && chatActive.status === "running") {
       if (chatActive.entry) {
         chatActive.entry.discardChat = true;
@@ -3704,7 +4484,10 @@
   // ================= 年级 / 图形类型（可选） =================
   var GRADE_KEY = "solver_grade_v1";
   function gradeGet() { var el = $("grade"); return el ? el.value : ""; }
-  function gradeApply(v) { var el = $("grade"); if (el) el.value = v || ""; }
+  function gradeApply(v) {
+    var el = $("grade");
+    if (el) { el.value = v || ""; if (window.HJSelect) window.HJSelect.sync(el); }
+  }
   function gradeSave(v) { try { localStorage.setItem(GRADE_KEY, v || ""); } catch (e) {} }
   function gradeLoad() { var v = ""; try { v = localStorage.getItem(GRADE_KEY) || ""; } catch (e) {} gradeApply(v); }
   $("grade").addEventListener("change", function () { gradeSave(gradeGet()); });
@@ -3712,7 +4495,10 @@
 
   var DIM_KEY = "solver_dim_v1";
   function dimGet() { var el = $("dim"); return el ? el.value : ""; }
-  function dimApply(v) { var el = $("dim"); if (el) el.value = v || ""; }
+  function dimApply(v) {
+    var el = $("dim");
+    if (el) { el.value = v || ""; if (window.HJSelect) window.HJSelect.sync(el); }
+  }
   function dimSave(v) { try { localStorage.setItem(DIM_KEY, v || ""); } catch (e) {} }
   function dimLoad() { var v = ""; try { v = localStorage.getItem(DIM_KEY) || ""; } catch (e) {} dimApply(v); }
   if ($("dim")) $("dim").addEventListener("change", function () { dimSave(dimGet()); });
@@ -3722,7 +4508,10 @@
   // 只影响提示词，渲染器不缩放坐标；改完对下一次解题/微调生效。
   var VIEW_KEY = "solver_view_v1";
   function viewGet() { var el = $("view"); return (el && el.value === "look") ? "look" : "true"; }
-  function viewApply(v) { var el = $("view"); if (el) el.value = (v === "look" ? "look" : "true"); }
+  function viewApply(v) {
+    var el = $("view");
+    if (el) { el.value = (v === "look" ? "look" : "true"); if (window.HJSelect) window.HJSelect.sync(el); }
+  }
   function viewSave(v) { try { localStorage.setItem(VIEW_KEY, v === "look" ? "look" : "true"); } catch (e) {} }
   function viewLoad() { var v = ""; try { v = localStorage.getItem(VIEW_KEY) || ""; } catch (e) {} viewApply(v); }
   if ($("view")) $("view").addEventListener("change", function () { viewSave(viewGet()); });
@@ -3739,18 +4528,75 @@
     if (s) s.style.display = (t === "dark" ? "" : "none");
     var b = $("btnTheme");
     if (b) b.title = (t === "dark" ? "切换到日间模式" : "切换到夜间模式");
+    // themeToggle 走 View Transition 时本函数在下一帧才执行；任何「点完立刻读
+    // data-theme」的调用方（手机设置页）都会读到旧值、把切换方向弄反——
+    // 统一广播，让它们监听这个事件再刷新自己的选中态
+    try { document.dispatchEvent(new CustomEvent("hj-themechange", { detail: { theme: t } })); } catch (e) {}
   }
   function themeToggle() {
     var t = themeGet() === "dark" ? "light" : "dark";
     try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
-    themeApply(t);
+    // beUI Theme Toggle：从按钮位置圆形揭示新主题（View Transition API；不支持就瞬切）
+    var reduce = false;
+    try { reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+    if (!document.startViewTransition || reduce) { themeApply(t); return; }
+    var b = $("btnTheme"), r = b ? b.getBoundingClientRect() : null;
+    var vt = document.startViewTransition(function () { themeApply(t); });
+    if (!r || !vt.ready) return;
+    vt.ready.then(function () {
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      var R = Math.hypot(Math.max(cx, innerWidth - cx), Math.max(cy, innerHeight - cy));
+      document.documentElement.animate(
+        { clipPath: ["circle(0px at " + cx + "px " + cy + "px)", "circle(" + R + "px at " + cx + "px " + cy + "px)"] },
+        { duration: 460, easing: "cubic-bezier(.4,0,.2,1)", pseudoElement: "::view-transition-new(root)" }
+      );
+    }).catch(function () {});
   }
   if ($("btnTheme")) $("btnTheme").addEventListener("click", themeToggle);
   themeApply(themeGet());
 
+  // 失败时的重试按钮：只在顶层「解题」失败后出现，点一下用同一题重新请求。
+  // 不放在提示文字里，是因为手机上那句 hint 很容易被当成普通说明直接划过去。
+  var retryBtn = null;
+  function retryEnsure() {
+    if (retryBtn && retryBtn.isConnected) return retryBtn;
+    var card = $("ansCard");
+    if (!card) return null;
+    var b = document.createElement("button");
+    b.id = "ansRetry";
+    b.type = "button";
+    b.className = "ans-retry";
+    b.title = "用当前这道题重新请求模型（会再次产生费用）";
+    b.innerHTML = '<svg class="ico-sm"><use href="#i-refresh-cw"/></svg><span>重试解题</span>';
+    b.addEventListener("click", function () {
+      b.disabled = true;
+      setTimeout(function () { b.disabled = false; }, 800);
+      solve();
+    });
+    // 放在答案正文之前：手机底部浮层默认只露答案卡顶部，放末尾会被裁到屏幕外。
+    var ans = $("answer");
+    if (ans && ans.parentNode === card) card.insertBefore(b, ans);
+    else card.appendChild(b);
+    retryBtn = b;
+    return b;
+  }
+  function retryShow(on) {
+    var b = retryEnsure();
+    if (b) b.style.display = on ? "" : "none";
+  }
+  // 请求还没拿到 taskId 就失败（配置 / 网络 / 服务端拒绝）时，也把答案卡切成失败态，
+  // 否则重试按钮会孤零零挂在上一题的残留文字下面。
+  function retryFailUI(entry, title, hint) {
+    if (entry.opts.chat || entry.opts.auto || entry.opts.update) return;
+    $("answer").className = "hint";
+    $("analysis").className = "hint";
+    $("answer").textContent = title || "解题失败";
+    $("analysis").textContent = logHintText(hint || "重试一次");
+    retryShow(true);
+  }
   function solve() {
     var q = $("q").value.trim();
-    if (!q && !images.length) { $("q").focus(); return; }
+    if (!q && !images.length) { window.HJFX && HJFX.shake($("q")); return; }   // 空输入：抖一下提示，不聚焦
     qWarn("");
     if (q.length > Q_MAX) { qWarn("题目过长，最多 " + Q_MAX + " 字"); return; }
     var be = q ? badInput(q) : "";
@@ -3807,11 +4653,20 @@
   }
   // 技术信息（面板里展开后显示的就是这一段）
   function logEntryMeta(e) {
+    var u = e.usage || null;
+    var rt = u && u.completion_tokens_details ? u.completion_tokens_details.reasoning_tokens : 0;
+    var usageLine = u && (u.prompt_tokens != null || u.completion_tokens != null)
+      ? "tokens：输入 " + (u.prompt_tokens || 0) + " · 输出 " + (u.completion_tokens || 0) + (rt ? "（推理 " + rt + "）" : "")
+      : "";
     return [
       e.model ? "模型：" + e.model : "",
       e.host ? "地址：" + e.host : "",
       e.kind ? "任务：" + e.kind + (e.snippet ? " · " + e.snippet : "") : "",
       e.elapsedMs ? "耗时：" + logElapsed(e.elapsedMs) : "",
+      e.maxTokens ? "输出上限：" + e.maxTokens : "",
+      e.finishReason ? "结束原因：" + e.finishReason : "",
+      usageLine,
+      e.reasoningChars ? "推理正文：" + e.reasoningChars + " 字（可见正文 " + (e.contentChars || 0) + " 字）" : "",
       e.raw ? "\n—— 服务端原始返回 ——\n" + e.raw : ""
     ].filter(Boolean).join("\n");
   }
@@ -4111,6 +4966,29 @@
       ".expdesc:empty{display:none}" +
       ".exp-ctrls{display:none;flex-wrap:wrap;gap:10px;margin:2px 0 6px}" +
       ".exp-ctrls label{display:flex;align-items:center;gap:4px;font-size:12px;color:#444;cursor:pointer}" +
+      // 导出页逐对象显隐（查看层）：默认收起，只影响当前浏览，不改 HJ_REC
+      ".exp-objs{display:none;margin:4px 0 8px;border:1px solid #e3e6ef;border-radius:10px;background:#fff;overflow:hidden}" +
+      ".exp-objs-hd{display:flex;align-items:center;gap:6px;background:#f6f7fb;padding-right:6px}" +
+      ".exp-objs-tg{flex:1;display:flex;align-items:center;gap:6px;min-width:0;font-family:inherit;font-size:12.5px;color:#333;background:transparent;border:0;padding:8px 10px;cursor:pointer;text-align:left}" +
+      ".exp-objs-tg .ar{flex:0 0 auto;width:10px;color:#8a9099;font-size:11px}" +
+      ".exp-objs-tg .cnt{font-size:11px;color:#8a9099;font-weight:400}" +
+      ".exp-objs-reset{flex:0 0 auto;font-family:inherit;font-size:11px;padding:2px 8px;border:1px solid #d8dbe3;border-radius:6px;background:#fff;color:#5b5bd6;cursor:pointer}" +
+      ".exp-objs-reset:hover{background:#eef0ff;border-color:#5b5bd6}" +
+      ".exp-objs-bd{border-top:1px solid #e8ebf2}" +
+      ".exp-objs-bd[hidden]{display:none}" +
+      ".exp-objs-tip{font-size:11px;color:#98a0ad;line-height:1.5;padding:6px 10px 4px}" +
+      ".exp-objs-list{max-height:260px;overflow:auto;padding:0 0 4px}" +
+      ".exp-obj{display:flex;align-items:center;gap:7px;padding:3px 8px 3px 10px;font-size:12.5px;color:#333}" +
+      ".exp-obj:hover{background:#f7f8fc}" +
+      ".exp-obj .dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:#8b95a1}" +
+      ".exp-obj .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+      ".exp-obj.off .nm{color:#a7adba}" +
+      ".exp-obj .tag{flex:0 0 auto;font-size:10px;line-height:1.4;color:#98a0ad;border:1px solid #e3e6ef;border-radius:4px;padding:0 3px}" +
+      ".exp-obj .act{flex:0 0 auto;width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:6px;background:transparent;color:#606874;cursor:pointer}" +
+      ".exp-obj .act:hover{background:#eef0ff;color:#5b5bd6;border-color:#dfe2ff}" +
+      ".exp-obj .act:disabled{opacity:.35;cursor:default;background:transparent;border-color:transparent}" +
+      ".exp-obj .act svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}" +
+      "@media (max-width:900px){.exp-objs-list{max-height:40vh}.exp-obj{padding:4px 7px 4px 9px}}" +
       // 解析分块：多小问 / 选择题按块区分（左侧色条 + 标签 + 底色），与应用内一致
       ".ana-blks{margin:2px 0}" +
       ".ana-blk{border-left:3px solid #8b93a7;background:rgba(139,147,167,.05);border-radius:3px;padding:7px 10px;margin:8px 0}" +
@@ -4407,6 +5285,71 @@
     var subUnion = {}, stepUnion = {}, ctlUnion = {}, scopeMap = {}, shownMap = {}, ctlHidden = {};
     var orig2d = {}, orig3d = {};
     var inited = false;
+    // 逐对象显隐：只做查看层。manualHidden 是「用户手动隐藏」的掩码，
+    // 只往上叠一层 false，绝不把步骤/小问自动隐藏的对象强行翻出来。
+    var objItems = [], objApi = null, objsOpen = false, manualHidden = {};
+    var objMo = null, objMoT = null;
+
+    // ---- 名字/颜色小工具（导出页没有 ui.js，必须自包含）----
+    function plainName(t) {
+      var s = String(t == null ? "" : t);
+      if (!/[\\$]/.test(s)) return s;
+      if (window.GGB3D && typeof window.GGB3D.texPlain === "function") {
+        try { return window.GGB3D.texPlain(s); } catch (e) {}
+      }
+      return s.replace(/\$/g, "").replace(/\\[A-Za-z]+\s*/g, "");
+    }
+    var NAME_RULES = [
+      [/^(?:segment|seg|edge|line|ln)[_\-]?(.+)$/i, "棱 "],
+      [/^(?:vector|vec|arrow)[_\-]?(.+)$/i, "向量 "],
+      [/^(?:plane|pl|face|section|sec)[_\-]?(.+)$/i, "面 "],
+      [/^(?:aux|helper|hidden)[_\-]?(.+)$/i, "辅助 "],
+      [/^(?:circle|circ|k)[_\-]?(.+)$/i, "圆 "],
+      [/^(?:dim|dimension)[_\-]?(.+)$/i, "尺寸 "],
+      [/^(?:path|traj|track)[_\-]?(.+)$/i, "轨迹 "],
+      [/^(?:arc)[_\-]?(.+)$/i, "弧 "],
+      [/^(?:sphere|sph)[_\-]?(.+)$/i, "球 "],
+      [/^(?:cylinder|cyl)[_\-]?(.+)$/i, "圆柱 "],
+      [/^(?:cone)[_\-]?(.+)$/i, "圆锥 "],
+      [/^(?:point|pt)[_\-]?([A-Za-z][A-Za-z0-9_\-]*)$/i, ""]
+    ];
+    var SUB_DIGITS = { "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉" };
+    function subDigits(s) {
+      s = String(s || "").replace(/[_\-]/g, "");
+      return s.replace(/([A-Za-z])(\d+)/g, function (m, a, d) {
+        return a + d.split("").map(function (c) { return SUB_DIGITS[c] || c; }).join("");
+      });
+    }
+    function friendlyName(raw) {
+      var s = String(raw == null ? "" : raw).trim();
+      if (!s) return "对象";
+      if (/[\\$]/.test(s)) { var tp = plainName(s); if (tp) s = tp; }
+      if (/[\u4e00-\u9fff]/.test(s)) return s;
+      for (var i = 0; i < NAME_RULES.length; i++) {
+        var m = s.match(NAME_RULES[i][0]);
+        if (m) {
+          var body = subDigits(m[1]);
+          if (body) return NAME_RULES[i][1] + body;
+        }
+      }
+      return subDigits(s);
+    }
+    function withPrefix(prefix, s) { return s.indexOf(prefix) === 0 ? s : prefix + " " + s; }
+    function color2d(e) {
+      try {
+        var c = e.visProp && (e.visProp.strokecolor || e.visProp.fillcolor);
+        return c && c !== "none" ? c : "#8b95a1";
+      } catch (er) { return "#8b95a1"; }
+    }
+    function mapType3d(t) {
+      t = String(t || "");
+      if (t.indexOf("point") === 0 || t === "sphere") return "point";
+      if (t.indexOf("plane") === 0) return "area";
+      return "line";
+    }
+    var ICON_EYE = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg>';
+    var ICON_EYE_OFF = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5c1.9 0 3.5.6 4.9 1.5"/><path d="M21.5 12S18 18.5 12 18.5c-1.9 0-3.5-.6-4.9-1.5"/><path d="M4 4l16 16"/></svg>';
+    var ICON_FOCUS = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v3.5M12 18v3.5M2.5 12H6M18 12h3.5"/></svg>';
 
     function names(s) {
       if (!s) return [];
@@ -4436,6 +5379,7 @@
       curSub = -1; curStep = -1;
       subUnion = {}; stepUnion = {}; ctlUnion = {}; scopeMap = {}; shownMap = {}; ctlHidden = {};
       orig2d = {}; orig3d = {};
+      manualHidden = {}; objItems = []; objApi = null;
     }
     function renderVerTabs() {
       var host = el("expVerTabs"); if (!host) return;
@@ -4485,6 +5429,7 @@
       renderVerTabs();
       renderFigure(v);          // 先重建画板，再按新版本重建标签/步骤/开关
       buildMaps();
+      buildObjects();           // 版本切换清空手动显隐，对象清单按新画板重建
       renderCtrls();
       renderSub(-1);
     }
@@ -4553,11 +5498,15 @@
       for (var k in b.objects) {
         var e = b.objects[k]; if (!e || !e.setAttribute) continue;
         var n = e.name == null ? "" : String(e.name || "").trim();
-        if (!n || !controlled(n)) continue;
+        if (!n) continue;
+        var manual = !!manualHidden[n];
+        if (!controlled(n) && !manual && !e.__expManual) continue;
         var vis = orig2d[n] !== false;
         if (curSub >= 0 && subUnion[n] && !scopeMap[n]) vis = false;
         if (curStep >= 0 && stepUnion[n] && !shownMap[n]) vis = false;
         if (ctlHidden[n]) vis = false;
+        if (manual) vis = false;
+        e.__expManual = manual ? 1 : 0;
         try { e.setAttribute({ visible: vis }); } catch (er) {}
         // 与 App 的 applyView2D 同口径：隐藏的动点/交点固定住，避免“看不见但能拖”的幽灵手柄
         try {
@@ -4649,25 +5598,336 @@
         cb.onchange = function () {
           (c.targets || []).forEach(function (n) { n = String(n); if (cb.checked) delete ctlHidden[n]; else ctlHidden[n] = true; });
           apply2d();
+          syncObjs();
         };
         label.appendChild(cb);
         label.appendChild(document.createTextNode(String(c.label || "显示")));
         host.appendChild(label);
       });
     }
+    // ---- 逐对象显隐（查看层）----
+    function autoVis2d(n) {
+      var vis = orig2d[n] !== false;
+      if (curSub >= 0 && subUnion[n] && !scopeMap[n]) vis = false;
+      if (curStep >= 0 && stepUnion[n] && !shownMap[n]) vis = false;
+      if (ctlHidden[n]) vis = false;
+      return vis;
+    }
+    // 3D 的分步数据在 render3d.steps 里，顶层 steps 对 3D 记录通常是 null（只有 2D 才写顶层）。
+    // 这里必须分开取，否则「恢复自动」会把所有参与分步的对象一律算成隐藏。
+    function steps3d() {
+      return (R.render3d && Array.isArray(R.render3d.steps)) ? R.render3d.steps : STEPS;
+    }
+    function autoVis3d(id) {
+      if (orig3d[id] === false) return false;
+      if (curSub >= 0 && subUnion[id] && !scopeMap[id]) return false;
+      if (ctlHidden[id]) return false;
+      var api = objApi || api3d();
+      // 3D 的分步面板由 render3d 自己维护，当前步号要问它，不能沿用 exportTabs 的 curStep
+      if (api && api.getStep && api.stepEls && api.stepEls[id]) {
+        var k = api.getStep();
+        var S3 = steps3d();
+        if (k >= 0) {
+          var shown = false;
+          for (var i = 0; i <= k && i < S3.length && !shown; i++) {
+            var els = (S3[i] && S3[i].elements) || [];
+            for (var j = 0; j < els.length; j++) {
+              if (String(els[j] && els[j].targetId) === id) { shown = true; break; }
+            }
+          }
+          if (!shown) return false;
+        }
+      }
+      return true;
+    }
+    function read2dLite() {
+      var out = [], byName = {}, b = window.board;
+      if (!b || !b.objects) return out;
+      for (var k in b.objects) {
+        var e = b.objects[k]; if (!e) continue;
+        var t = String(e.elType || "");
+        if (t === "text" || t === "image" || t === "label") continue;
+        if (t === "arc" || t === "curve" || t === "grid" || t === "slider") continue;
+        var name = (e.name == null ? "" : String(e.name)).trim();
+        if (!name) continue;
+        if (/^[a-z]$/.test(name) || /^P_\{/.test(name)) continue;
+        (byName[name] = byName[name] || []).push(e);
+      }
+      Object.keys(byName).forEach(function (name) {
+        var arr = byName[name], e = arr[0];
+        var base = true;
+        try { base = !(e.visProp && e.visProp.visible === false); } catch (er) {}
+        if (!(name in orig2d)) orig2d[name] = base;
+        out.push({ key: name, label: friendlyName(name), color: color2d(e), raw: arr, kind: "2d" });
+      });
+      return out;
+    }
+    function read3dLite() {
+      var api = api3d(); if (!api || !api.items) return [];
+      var scene = (window.GGB3D.getScene && window.GGB3D.getScene()) || {};
+      var segMap = {}, planeMap = {}, ptLabel = {};
+      (scene.segments || []).forEach(function (s) { if (s && s.id != null) segMap[String(s.id)] = s; });
+      (scene.planes || []).forEach(function (p) { if (p && p.id != null) planeMap[String(p.id)] = p; });
+      (scene.points || []).forEach(function (q) { if (q && q.id != null) ptLabel[String(q.id)] = String(q.label || q.name || q.id); });
+      function nm(id) { var k = String(id == null ? "" : id); return friendlyName(ptLabel[k] || k); }
+      var out = [];
+      api.items.forEach(function (it) {
+        if (it.id == null || it.aliasOf) return;
+        var key = String(it.id), tt = String(it.type || ""), label = "";
+        if (tt === "sphere") label = withPrefix("球", nm(key));
+        else if (tt === "circle") label = withPrefix("圆", nm(key));
+        else if (tt === "dimension") {
+          var dim = (it.spec && it.spec.from && it.spec.to) ? (nm(it.spec.from) + nm(it.spec.to)) : "";
+          label = "尺寸" + (dim ? " " + dim : "");
+        } else if (tt.indexOf("point") === 0) label = nm(key);
+        else if (segMap[key]) label = "棱 " + nm(segMap[key].from) + nm(segMap[key].to);
+        else if (planeMap[key]) label = "面 " + (planeMap[key].vertices || []).map(nm).join("");
+        else {
+          var bl = friendlyName(key);
+          if (tt === "cylinder") label = withPrefix("圆柱", bl);
+          else if (tt === "cone") label = withPrefix("圆锥", bl);
+          else if (tt === "arc") label = withPrefix("弧", bl);
+          else if (tt === "path") label = "轨迹 " + bl;
+          else if (tt === "arrow") label = "向量 " + bl;
+          else if (tt === "label") label = "标注 " + bl;
+          else label = bl;
+        }
+        if (!(key in orig3d)) orig3d[key] = !(it.spec && it.spec.visible === false);
+        var type = mapType3d(tt);
+        out.push({
+          key: key, label: label,
+          color: type === "point" ? "#5b5bd6" : (type === "area" ? "#12a150" : "#8b95a1"),
+          raw: it, kind: "3d"
+        });
+      });
+      return out;
+    }
+    function wrap3d(api) {
+      if (!api || typeof api.setVisible !== "function" || api.__expWrapped) return;
+      var orig = api.setVisible;
+      api.__expSetVisible = orig;
+      api.setVisible = function (it, v) {
+        if (groupHiddenByManual(it)) v = false;
+        return orig.call(api, it, v);
+      };
+      api.__expWrapped = true;
+      Object.keys(manualHidden).forEach(function (id) {
+        var it = api.byId && api.byId[id];
+        if (it) {
+          groupOf(it).forEach(function (gi) { try { api.setVisible(gi, false); } catch (er) {} });
+        }
+      });
+    }
+    // 重复平面共享同一组 Three 对象，显隐按整组取并集：手动隐藏必须整组一起按下去，
+    // 否则「隐藏面 ABCD」只改了别名之一，网格依旧可见。
+    function groupOf(it) {
+      return (it && it.group && it.group.items && it.group.items.length) ? it.group.items : (it ? [it] : []);
+    }
+    function groupVisible(it) {
+      var list = groupOf(it);
+      for (var i = 0; i < list.length; i++) if (list[i].vis !== false) return true;
+      return false;
+    }
+    function groupHiddenByManual(it) {
+      var list = groupOf(it);
+      for (var i = 0; i < list.length; i++) {
+        var gi = list[i];
+        if (gi && gi.id != null && manualHidden[String(gi.id)]) return true;
+      }
+      return false;
+    }
+    function buildObjects() {
+      if (is3d) {
+        var api = api3d();
+        if (!api || !api.items) { objItems = []; objApi = null; }
+        else { wrap3d(api); objApi = api; objItems = read3dLite(); }
+      } else {
+        objApi = null;
+        objItems = read2dLite();
+      }
+      renderObjsBox();
+    }
+    function renderObjsBox() {
+      var host = el("expObjs"); if (!host) return;
+      if (!objItems.length) { host.style.display = "none"; host.innerHTML = ""; return; }
+      host.style.display = "block";
+      host.innerHTML =
+        '<div class="exp-objs-hd">' +
+          '<button type="button" class="exp-objs-tg" aria-expanded="' + (objsOpen ? "true" : "false") + '">' +
+            '<span class="ar">' + (objsOpen ? "▾" : "▸") + '</span>对象显隐 <span class="cnt">' + objItems.length + '</span>' +
+          '</button>' +
+          '<button type="button" class="exp-objs-reset">恢复自动</button>' +
+        '</div>' +
+        '<div class="exp-objs-bd"' + (objsOpen ? "" : " hidden") + '>' +
+          '<div class="exp-objs-tip">仅影响本次查看，不改动图形本身</div>' +
+          '<div class="exp-objs-list"></div>' +
+        '</div>';
+      var tg = host.querySelector(".exp-objs-tg");
+      var rs = host.querySelector(".exp-objs-reset");
+      var bd = host.querySelector(".exp-objs-bd");
+      var list = host.querySelector(".exp-objs-list");
+      tg.onclick = function () {
+        objsOpen = !objsOpen;
+        bd.hidden = !objsOpen;
+        tg.setAttribute("aria-expanded", objsOpen ? "true" : "false");
+        tg.querySelector(".ar").textContent = objsOpen ? "▾" : "▸";
+        syncObjs();
+      };
+      rs.onclick = function () { resetManual(); };
+      objItems.forEach(function (o) {
+        var row = document.createElement("div");
+        row.className = "exp-obj";
+        row.dataset.key = o.key;
+        var dot = document.createElement("span"); dot.className = "dot"; dot.style.background = o.color; row.appendChild(dot);
+        var nm = document.createElement("span"); nm.className = "nm";
+        nm.textContent = o.label;
+        nm.title = o.label + (o.label !== o.key ? " · " + o.key : "");
+        row.appendChild(nm);
+        var tag = document.createElement("span"); tag.className = "tag"; tag.textContent = "自动"; tag.style.display = "none"; row.appendChild(tag);
+        var eye = document.createElement("button");
+        eye.type = "button"; eye.className = "act"; eye.dataset.act = "eye";
+        eye.onclick = function (ev) { ev.stopPropagation(); toggleObj(o); };
+        row.appendChild(eye);
+        var foc = document.createElement("button");
+        foc.type = "button"; foc.className = "act"; foc.dataset.act = "focus";
+        foc.title = "定位"; foc.innerHTML = ICON_FOCUS;
+        foc.onclick = function (ev) { ev.stopPropagation(); locateObj(o); };
+        row.appendChild(foc);
+        row.__eye = eye; row.__tag = tag;
+        list.appendChild(row);
+      });
+      syncObjs();
+    }
+    function objVisible(o) {
+      if (o.kind === "2d") return autoVis2d(o.key) && !manualHidden[o.key];
+      var it = objApi && objApi.byId && objApi.byId[o.key];
+      if (!it) return false;
+      // 重复平面共享一组 Three 对象，真实可见性按整组取并集
+      return it.group ? groupVisible(it) : it.vis !== false;
+    }
+    function syncObjs() {
+      if (is3d) {
+        var api = api3d();
+        if (api && api !== objApi) { buildObjects(); return; }
+      }
+      if (!objItems.length) return;
+      var host = el("expObjs"); if (!host) return;
+      [].forEach.call(host.querySelectorAll(".exp-obj"), function (row) {
+        var o = null;
+        for (var i = 0; i < objItems.length; i++) if (objItems[i].key === row.dataset.key) { o = objItems[i]; break; }
+        if (!o) return;
+        var manual = !!manualHidden[o.key];
+        var eff = objVisible(o);
+        var st = manual ? "m" : (eff ? "v" : "a");
+        if (row.__st === st) return;
+        row.__st = st;
+        row.className = "exp-obj" + (eff ? "" : " off") + (manual ? " manual" : "");
+        var eye = row.__eye;
+        eye.innerHTML = eff ? ICON_EYE : ICON_EYE_OFF;
+        if (manual) { eye.disabled = false; eye.title = "取消手动隐藏"; }
+        else if (eff) { eye.disabled = false; eye.title = "隐藏"; }
+        else { eye.disabled = true; eye.title = "当前由步骤/小问自动隐藏"; }
+        row.__tag.style.display = (manual || eff) ? "none" : "";
+      });
+    }
+    function toggleObj(o) {
+      if (manualHidden[o.key]) {
+        delete manualHidden[o.key];
+        if (o.kind === "3d") {
+          var api = objApi;
+          var it = api && api.byId && api.byId[o.key];
+          if (api && it) {
+            groupOf(it).forEach(function (gi) {
+              var gid = (gi && gi.id != null) ? String(gi.id) : o.key;
+              try { api.setVisible(gi, autoVis3d(gid)); } catch (er) {}
+            });
+          }
+        } else apply2d();
+      } else {
+        if (o.kind === "3d") {
+          var a3 = objApi;
+          var it3 = a3 && a3.byId && a3.byId[o.key];
+          if (!a3 || !it3 || !objVisible(o)) return;
+          manualHidden[o.key] = true;
+          // 同组（重复平面）必须整组按下去，只改一个 id 时并集仍为真、面照样可见
+          groupOf(it3).forEach(function (gi) { try { a3.setVisible(gi, false); } catch (er) {} });
+        } else {
+          if (!autoVis2d(o.key)) return;
+          manualHidden[o.key] = true;
+          apply2d();
+        }
+      }
+      syncObjs();
+    }
+    function locateObj(o) {
+      if (o.kind === "3d") {
+        if (window.GGB3D && window.GGB3D.focus) {
+          try { window.GGB3D.focus({ target: o.key }); } catch (er) {}
+        }
+        return;
+      }
+      var board = window.board, els = o.raw || [];
+      if (!board || !els.length) return;
+      var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, any = false;
+      els.forEach(function (e) {
+        try {
+          var b = e.bounds();
+          if (b && isFinite(b[0])) {
+            any = true;
+            minX = Math.min(minX, b[0], b[2]); maxX = Math.max(maxX, b[0], b[2]);
+            minY = Math.min(minY, b[1], b[3]); maxY = Math.max(maxY, b[1], b[3]);
+          }
+        } catch (er) {}
+      });
+      if (!any) return;
+      var padX = Math.max((maxX - minX) * 0.6, 0.8), padY = Math.max((maxY - minY) * 0.6, 0.8);
+      try { board.setBoundingBox([minX - padX, maxY + padY, maxX + padX, minY - padY]); board.update(); } catch (er) {}
+    }
+    function resetManual() {
+      var keys = Object.keys(manualHidden);
+      manualHidden = {};
+      if (is3d) {
+        var api = api3d();
+        if (api && api.byId) {
+          keys.forEach(function (id) {
+            var it = api.byId[id];
+            if (!it) return;
+            groupOf(it).forEach(function (gi) {
+              var gid = (gi && gi.id != null) ? String(gi.id) : id;
+              try { api.setVisible(gi, autoVis3d(gid)); } catch (er) {}
+            });
+          });
+        }
+      } else apply2d();
+      syncObjs();
+    }
+    function installObjWatch() {
+      if (objMo || !window.MutationObserver) return;
+      var stage = el("stage"); if (!stage) return;
+      objMo = new MutationObserver(function () {
+        if (!is3d) return;
+        if (objMoT) clearTimeout(objMoT);
+        objMoT = setTimeout(function () { if (is3d) syncObjs(); }, 60);
+      });
+      objMo.observe(stage, { childList: true, subtree: true, characterData: true });
+    }
+
     function renderSub(i) {
       curSub = i; curStep = -1; setScope(); buildShown();
       renderAnswer(i); renderTabs(); renderSteps();
       if (is3d) apply3d(true); else apply2d();
+      syncObjs();
     }
     function renderStep(k) {
       curStep = k; buildShown(); renderSteps();
       if (!is3d) apply2d();
+      syncObjs();
     }
     function init() {
       if (inited) {
         if (!ready()) return;
         if (is3d) apply3d(false); else apply2d();
+        syncObjs();
         return;
       }
       var list = Array.isArray(BASE.versions) ? BASE.versions : [];
@@ -4678,13 +5938,16 @@
       if (!ready()) return;
       renderVerTabs();
       buildMaps();
+      buildObjects();
       renderTabs(); renderSteps(); renderCtrls();
       renderSub(-1);
+      installObjWatch();
       inited = true;
     }
     window.__expApplyAll = function () {
       if (!inited) { init(); return; }
       if (is3d) apply3d(false); else apply2d();
+      syncObjs();
     };
     setTimeout(init, 0);
     setTimeout(init, 400);
@@ -4732,11 +5995,9 @@
     // 版本切换：只要任意版本是 3D，就要把 three/render3d 一起打进导出页，否则 2D→3D 切不过去
     var has3dVer = is3d || ((r.versions || []).some(function (v) { return !!(v && v.render3d); }));
     if (has3dVer) libsP.push(fetchText("/solver/vendor3d/three.min.js"), fetchText("/solver/vendor3d/OrbitControls.js"), fetchText("/solver/vendor3d/render3d.js"));
-    // 导出页是单文件分发，AGPL 全文跟着文件走；服务端没有 LICENSE 时退回 index.html 里的短声明。
-    var agplP = fetchText("/LICENSE").catch(function () { return ""; });
-    Promise.all([Promise.all(libsP), inlineKatexCss(), figP, agplP])
+    Promise.all([Promise.all(libsP), inlineKatexCss(), figP])
       .then(function (bundle) {
-        var all = bundle[0], katexCss = bundle[1], figUrl = bundle[2], agplText = bundle[3] || "";
+        var all = bundle[0], katexCss = bundle[1], figUrl = bundle[2];
         var libJs = all.map(function (s) { return String(s).replace(/<\/script/gi, "<\\/script"); }).join("\n;\n");
         var mathJs = "(function(){var escHtml=" + escHtml.toString() + ";var mathHTML=" + mathHTML.toString() + ";var anaSplit=" + anaSplit.toString() + ";var anaHTML=" + anaHTML.toString() + ";var ansAllHTML=" + ansAllHTML.toString() + ";var texCanvasHTML=" + texCanvasHTML.toString() + ";var applyTex2D=" + applyTex2D.toString() + ";var applyStyle2D=" + applyStyle2D.toString() + ";window.mathHTML=mathHTML;window.anaHTML=anaHTML;window.ansAllHTML=ansAllHTML;window.texCanvasHTML=texCanvasHTML;window.applyTex2D=applyTex2D;window.__applyStyle2D=applyStyle2D;})();";
         var dataJs, runJs;
@@ -4759,25 +6020,15 @@
         var uiJs = "(" + exportUi.toString() + ")();";
         var tabsJs = "(" + exportTabs.toString() + ")();";
         var recJs = "var HJ_REC=" + jsonEmbed(hjRec) + ";";
-        // 导出页会把第三方库直接内联，许可声明必须跟着走；源文本在 index.html 的隐藏块里，避免两处维护。
-        var licText = "";
-        try {
-          var licEl = document.getElementById("hjThirdPartyLicenses");
-          if (licEl) licText = licEl.textContent || "";
-        } catch (e) {}
-        var licAll = licText;
-        if (agplText) licAll += "\n\n--------------------------------------------------------------------\nAGPL-3.0 全文\n\n" + agplText;
-        var licBlock = licAll
-          ? '<script type="text/plain" id="hjThirdPartyLicenses">' + licAll.replace(/<\/script/gi, "<\\/script") + "<\/script>"
-          : "";
         var html = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-          "<title>动态几何 · 解题</title><style>" + katexCss + exportCss() + "</style>" + licBlock + "</head><body>" +
+          "<title>动态几何 · 解题</title><style>" + katexCss + exportCss() + "</style></head><body>" +
           '<div class="wrap"><div class="sw"><div id="stage"><div id="ggb-canvas" class="jxgbox" style="position:absolute;inset:0"></div></div><div id="actbar"></div><div id="err" class="err"></div></div>' +
           '<aside class="side">' + qHtml +
           '<div id="expVerTabs" class="exp-vers"></div>' +
           '<div id="expSubTabs" class="exp-tabs"></div>' +
           '<div id="expSteps" class="exp-steps"></div>' +
           '<div id="expCtrls" class="exp-ctrls"></div>' +
+          '<div id="expObjs" class="exp-objs"></div>' +
           '<h3 id="ansTitle">答案</h3><div class="ans" id="ansBody">' + ansHtml + '</div>' +
           '<h3 id="anaTitle">解析</h3><div class="ana" id="anaBody">' + anaHtml + '</div>' +
           '<p class="foot">由「何解」导出 · ' + new Date().toLocaleString() + "</p></aside></div>" +

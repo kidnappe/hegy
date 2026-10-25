@@ -25,6 +25,11 @@
 node_modules/
 desktop/dist/
 desktop/dist-arm64/
+mobile/node_modules/
+mobile/www/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
 solver/config.json
 .env
 .env.*

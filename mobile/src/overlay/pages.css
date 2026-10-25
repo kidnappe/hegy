@@ -1,0 +1,791 @@
+/* =========================================================
+   何解 · 手机端「设置 / 历史 / 关于」三页的视觉层（pages.css）
+   ---------------------------------------------------------
+   为什么单独一个文件：
+     mobile.css 是「首页 / 解题浮层」那条线的主战场，多人并行时谁都在改；
+     本文件只负责 pages.js 画出来的三页，改这里不会碰到别人的规则，
+     也方便整体回退（删掉 prepare.js 里那一行 <link> 就回到旧外观）。
+   加载顺序：ui.css → mobile.css → skins.css → pages.css（prepare.js 注入并断言）。
+     顺序是硬契约：本文件靠"加载在最后 + 同特异性"覆盖 mobile.css。
+     ⚠ 改动顺序不会报错，只会静默退回旧外观 —— prepare.js 里已有断言拦住。
+
+   ★ 接管清单（mobile.css 里同名的这些规则，对这三页已经失效，别再改那边）：
+     · 设置列表   .m-set-hd / .m-set-root / .m-set-row(+ .n .d .v .chev)
+     · 设置子页   .m-set-subbody / .m-set-page / .m-set-acc .acc-b/.field
+                  .m-set-adv / .m-set-test / .m-set-pick / .m-set-pick-row(+ .chk .sw)
+     · 历史       #histModal .mhead / .mbody / #histSub / .hist-group
+                  .hist-row / .hist-item(+ .thumb-sm .qtext .sub) / .hist-rail
+                  .hist-del / .m-hist-clear / .hist-empty
+     · 关于       .about-* / .ab-*（mobile.css 里没有，纯新增；桌面那份锁在
+                  ui.css 的 @media (min-width:761px) 里，手机上不生效）
+     · 公共       .m-back
+     要改这几页的外观，改这个文件；要改首页 / 解题浮层，改 mobile.css。
+
+   规则：
+     1. 全部包在 @media (max-width:760px) 里，桌面零影响；
+     2. 配色只用 ui.css / skins.css 的变量，三套皮肤 + 夜间自动跟随；
+     3. 不改 id / class 名，只加新 class（m-set-ico / m-set-group / m-hist-h1…）。
+   ========================================================= */
+
+@media (max-width:760px) {
+
+  /* ---------------- 共用：页面头部 ----------------
+     大标题放正文里（iOS large-title 那种），头部只留返回 + 操作，
+     所以头部背景跟页面同色、不要分割线。 */
+  #cfgModal.m-cfg .m-set-hd,
+  #histModal.m-hist .mhead{
+    position: relative;
+    z-index: 3;
+    height: 52px;
+    padding: 0 6px;
+    background: var(--bg);
+    border-bottom: none;
+  }
+  #cfgModal.m-cfg .m-set-hd::after,
+  #histModal.m-hist .mhead::after{
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 100%;
+    height: 12px;
+    background: linear-gradient(var(--bg), transparent);
+    pointer-events: none;
+  }
+  .m-set-title{ font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+  /* 列表页不显示头部标题（正文里已有大标题），进子页才显示 */
+  #cfgModal.m-cfg .m-set:not(.m-set-sub) .m-set-title{ display: none; }
+
+  /* ---------------- 共用：正文大标题 ----------------
+     设置根页与历史页共用同一套字号/间距，两页并排看必须一模一样。 */
+  .m-set-hero{ padding: 6px 2px 20px; }
+  .m-set-hero h1,
+  .m-hist-h1{
+    font-family: var(--font-heading);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -.025em;
+    color: var(--txt);
+  }
+  .m-set-hero h1{ margin: 0; }
+  .m-hist-h1{ margin: 6px 2px 0; }
+  .m-set-hero p,
+  #histModal.m-hist #histSub{
+    margin: 7px 2px 0;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--txt-3);
+    background: none;
+    border: none;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* =========================================================
+     一、设置 · 列表页
+     ========================================================= */
+  .m-set-root{
+    padding: 0 16px 40px;
+    animation: none;              /* 大标题页不做整页位移，交给卡片入场 */
+  }
+  .m-set-root:not(.hide){ animation: hjPgRootIn .26s cubic-bezier(.2,.8,.25,1) both; }
+
+  .m-set-group{ margin-bottom: 20px; }
+  .m-set-group:last-child{ margin-bottom: 6px; }
+  .m-set-page > .m-set-group:first-child{ margin-top: 6px; }
+  .m-set-group-h{
+    padding: 0 2px 9px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    color: var(--txt-3);
+  }
+  .m-set-card{
+    border-radius: 16px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(20,24,32,.04);
+    overflow: hidden;
+  }
+
+  .m-set-row{
+    position: relative;
+    min-height: 62px;
+    padding: 11px 13px;
+    gap: 12px;
+    border: none;
+    border-radius: 0;
+    background: none;
+    transition: background-color .14s;
+  }
+  .m-set-row:active{ background: var(--hover); }
+  /* 行间发丝线，从文字左缘起（图标让开） */
+  .m-set-row + .m-set-row::before{
+    content: "";
+    position: absolute;
+    left: 61px; right: 0; top: 0;
+    height: 1px;
+    background: var(--line-2);
+  }
+  .m-set-ico{
+    flex: none;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--accent) 11%, transparent);
+    color: var(--accent);
+  }
+  .m-set-ico svg{
+    width: 19px; height: 19px;
+    fill: none; stroke: currentColor; stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .m-set-row-main{ gap: 2px; }
+  .m-set-row .n{ font-size: 15px; font-weight: 500; color: var(--txt); letter-spacing: -.005em; }
+  .m-set-row .d{ font-size: 12px; line-height: 1.35; color: var(--txt-3); }
+  .m-set-row .v{ font-size: 12.5px; color: var(--txt-3); max-width: 40%; }
+  .m-set-row .chev{
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px;
+    color: var(--txt-3);
+    opacity: .55;
+    transition: transform .16s cubic-bezier(.34,1.4,.64,1);
+  }
+  .m-set-row .chev svg{
+    width: 17px; height: 17px;
+    fill: none; stroke: currentColor; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .m-set-row:active .chev{ transform: translateX(2px); opacity: .9; }
+
+  /* 危险行：图标与标题都用功能红 */
+  .m-set-row.danger .m-set-ico{
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    color: var(--danger);
+  }
+  .m-set-row.danger .n{ color: var(--danger); }
+
+  /* =========================================================
+     二、设置 · 子页
+     ========================================================= */
+  .m-set-subbody{ padding: 6px 16px 36px; }
+  .m-set-page.show{ animation: hjPgSubIn .24s cubic-bezier(.2,.8,.25,1) both; }
+  .m-set-page .m-set-note{
+    margin: 2px 2px 14px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    /* --txt-3 在默认皮肤的浅色下只有 ~2.6:1，说明文字用 --txt-2 才读得清 */
+    color: var(--txt-2);
+  }
+
+  /* 模型子页：字段整块收进一张卡 */
+  #cfgModal.m-cfg .m-set-acc .acc-b{
+    display: block !important;
+    padding: 14px 14px 4px;
+    border-radius: 16px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(20,24,32,.04);
+  }
+  #cfgModal.m-cfg .m-set-acc .field{ margin-bottom: 15px; }
+  #cfgModal.m-cfg .m-set-acc .field label{
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--txt-2);
+    margin-bottom: 6px;
+  }
+  #cfgModal.m-cfg .m-set-acc .field input,
+  #cfgModal.m-cfg .m-set-acc .field select{
+    height: 46px;
+    border-radius: 11px;
+    background: var(--bg);
+  }
+  /* 高级设置：卡片底部的一条折叠条 */
+  #cfgModal.m-cfg .m-set-adv{ margin: 2px -14px 0; border-top: 1px solid var(--line-2); }
+  #cfgModal.m-cfg .m-set-adv-t{
+    height: 48px;
+    padding: 0 14px;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--txt-2);
+  }
+  #cfgModal.m-cfg .m-set-adv.open .m-set-adv-t{ color: var(--accent); }
+  #cfgModal.m-cfg .m-set-adv-b{ padding-top: 12px; }
+  #cfgModal.m-cfg .m-set-test{ margin-top: 14px; }
+  #cfgModal.m-cfg .m-set-test #btnTest{
+    width: 100%;
+    height: 48px;
+    border-radius: 13px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--txt);
+    font-size: 14.5px;
+    font-weight: 500;
+  }
+  #cfgModal.m-cfg .m-set-test #btnTest:active{ background: var(--hover); }
+  #cfgModal.m-cfg .m-set-test #cfgMsg{ font-size: 12px; line-height: 1.5; color: var(--txt-3); }
+
+  /* 「获取列表」和模型输入同一行，高度/圆角要对齐 */
+  #cfgModal.m-cfg .m-set-acc #btnModels{
+    flex: none;
+    height: 46px;
+    padding: 0 14px;
+    border-radius: 11px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--txt);
+    font-size: 13px;
+  }
+  #cfgModal.m-cfg .m-set-acc #btnModels:active{ background: var(--hover); }
+  #cfgModal.m-cfg .m-set-acc .field .row{ gap: 8px; }
+
+  /* 外观 / 画法：选项卡 */
+  .m-set-pick{
+    border: none;
+    border-radius: 16px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(20,24,32,.04);
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .m-set-pick-row{
+    position: relative;
+    height: 56px;
+    padding: 0 14px;
+    border-bottom: none;
+    font-size: 14.5px;
+    font-weight: 450;
+  }
+  .m-set-pick-row + .m-set-pick-row::before{
+    content: "";
+    position: absolute;
+    left: 14px; right: 0; top: 0;
+    height: 1px;
+    background: var(--line-2);
+  }
+  .m-set-pick-row.col{ min-height: 66px; padding: 10px 14px; }
+  .m-set-pick-row .chk{
+    width: 21px; height: 21px;
+    border: 1.5px solid color-mix(in srgb, var(--txt-3) 55%, transparent);
+  }
+  .m-set-pick-row.on{
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+  }
+  .m-set-pick-row.on .t{ color: var(--txt); }
+  .m-set-pick-row.on .chk{
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
+  .m-set-pick-row.col .t .n{ font-size: 14.5px; font-weight: 600; }
+  .m-set-pick-row.col .t .d{ font-size: 11.5px; color: var(--txt-3); }
+  .m-set-pick-row .sw{ gap: 4px; margin-right: 11px; }
+  .m-set-pick-row .sw i{
+    width: 14px; height: 14px;
+    border-radius: 5px;
+    border: 1px solid color-mix(in srgb, var(--txt-3) 35%, transparent);
+  }
+
+  /* =========================================================
+     三、历史 · 列表
+     ========================================================= */
+  /* 页面底色统一：之前 .modal 是白的、分组条用 --bg，会露出一条灰带 */
+  #histModal.m-hist .modal{ background: var(--bg); }
+  #histModal.m-hist .mhead h2,
+  #histModal.m-hist .mhead .mhead-ico,
+  #histModal.m-hist .mhead .mhead-badge{ display: none; }
+  #histModal.m-hist .mhead .m-back{ margin-right: auto; }
+  .m-hist-clear{
+    margin-left: 0;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--danger) 9%, transparent);
+    color: var(--danger);
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+  .m-hist-clear:active{ background: color-mix(in srgb, var(--danger) 16%, transparent); }
+
+  #histModal.m-hist .mbody{ padding: 0 16px 36px; }
+
+  /* 大标题/副标题的字号在顶部「共用」段里，这里只管这一页的间距 */
+  #histModal.m-hist #histSub{ margin-bottom: 8px; }
+  #histModal.m-hist .hist-list{ margin: 0; padding: 0; }
+
+  /* 分组条：去掉灰带，改成粘顶的小标题 + 条数 */
+  #histModal.m-hist .hist-group{
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    top: 0;
+    z-index: 2;
+    padding: 12px 2px 9px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    color: var(--txt-2);
+    background: linear-gradient(var(--bg) 72%, color-mix(in srgb, var(--bg) 0%, transparent));
+  }
+  #histModal.m-hist .hist-group .gn{
+    font-weight: 500;
+    font-size: 11px;
+    color: var(--txt-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 卡片 */
+  #histModal.m-hist .hist-row{
+    margin: 0 0 9px;
+    border-radius: 16px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(20,24,32,.04);
+  }
+  #histModal.m-hist .hist-item{
+    padding: 12px;
+    gap: 12px;
+    align-items: center;
+    border: none;
+    border-radius: 16px;
+    /* 必须不透明：操作栏就在同一行的 z 轴下方，透明会把红色"漏"出来 */
+    background: var(--panel);
+    box-shadow: none;
+    animation: none;
+  }
+  #histModal.m-hist .hist-item:active{ transform: none; }
+  #histModal.m-hist .hist-item .thumb-sm{
+    flex: none;
+    width: 56px; height: 56px;
+    border-radius: 13px;
+    border: 1px solid var(--line-2);
+    background: var(--bg);
+  }
+  /* 纯文字题：给一块同尺寸的占位砖，保证所有卡片左缘对齐 */
+  #histModal.m-hist .hist-item .thumb-sm.pg-ph{
+    display: flex; align-items: center; justify-content: center;
+    color: var(--txt-3);
+    background: color-mix(in srgb, var(--accent) 6%, var(--bg));
+  }
+  #histModal.m-hist .hist-item .thumb-sm.pg-ph svg{
+    width: 21px; height: 21px;
+    fill: none; stroke: currentColor; stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round;
+    opacity: .7;
+  }
+  #histModal.m-hist .hist-item .meta{ padding-top: 0; }
+  #histModal.m-hist .hist-item .qtext{
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    font-size: 14.5px;
+    font-weight: 450;
+    line-height: 1.5;
+    color: var(--txt);
+    max-height: none;
+  }
+  #histModal.m-hist .hist-item .sub{
+    margin-top: 7px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--txt-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+  #histModal.m-hist .hist-item .sub b{
+    font-weight: 600;
+    color: var(--txt);
+  }
+  /* 右侧指示箭头（纯装饰，不占 DOM） */
+  #histModal.m-hist .hist-item::after{
+    content: "";
+    flex: none;
+    width: 7px; height: 7px;
+    margin-left: 2px; margin-right: 3px;
+    border-right: 1.6px solid var(--txt-3);
+    border-bottom: 1.6px solid var(--txt-3);
+    transform: rotate(-45deg);
+    opacity: .45;
+  }
+
+  /* 左滑操作栏 */
+  #histModal.m-hist .hist-rail{ width: 80px; }
+  #histModal.m-hist .hist-del{
+    width: 80px;
+    gap: 5px;
+    border-radius: 0 16px 16px 0;
+    background: var(--danger);
+    box-shadow: inset 10px 0 14px -10px rgba(0,0,0,.35);
+    font-size: 11.5px;
+    font-weight: 500;
+  }
+  #histModal.m-hist .hist-del:active{ filter: brightness(.92); }
+
+  /* 空态 */
+  #histModal.m-hist .hist-empty{
+    padding: 64px 16px 70px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--txt-3);
+  }
+
+  /* 进场：卡片轻微上浮，按顺序错开（js 里写 --i） */
+  #histModal.m-hist .hist-row{
+    animation: hjPgCardIn .3s cubic-bezier(.16,1,.3,1) both;
+    animation-delay: calc(var(--i, 0) * 22ms);
+  }
+
+  /* =========================================================
+     四、关于
+     ========================================================= */
+  #aboutModal.m-about{ align-items: stretch; background: var(--bg); }
+  #aboutModal.m-about .modal{
+    width: 100%; max-width: 100%;
+    height: 100dvh; max-height: 100dvh;
+    margin: 0; padding: 0;
+    border-radius: 0;
+    display: flex; flex-direction: column;
+    background: var(--bg);
+    box-shadow: none;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  #aboutModal.m-about .mhead{
+    position: relative; z-index: 3;
+    height: 52px; padding: 0 6px;
+    background: var(--bg);
+    border-bottom: none;
+  }
+  #aboutModal.m-about .mhead::after{
+    content: "";
+    position: absolute; left: 0; right: 0; top: 100%;
+    height: 12px;
+    background: linear-gradient(var(--bg), transparent);
+    pointer-events: none;
+  }
+  /* 应用名已在正文 hero 里，头部只留返回 */
+  #aboutModal.m-about .mhead h2,
+  #aboutModal.m-about .mhead .mhead-ico,
+  #aboutModal.m-about .dlg-close{ display: none; }
+
+  #aboutModal.m-about .about-body{
+    flex: 1 1 auto; min-height: 0;
+    padding: 2px 16px 40px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  #aboutModal.m-about .about-hero{
+    /* 显式写全：ui.css 的 .about-hero 是居中列，这里重写一遍防止被别的层盖掉 */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 4px 0 18px;
+  }
+  #aboutModal.m-about .about-logo{
+    width: 68px; height: 68px;
+    border-radius: 19px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    box-shadow: 0 12px 28px -18px rgba(20,24,32,.5);
+  }
+  #aboutModal.m-about .about-hero-t{
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  #aboutModal.m-about .about-hero-t b{
+    font-family: var(--font-heading);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    color: var(--txt);
+  }
+  #aboutModal.m-about .ab-en{
+    font-size: 11.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--txt-3);
+  }
+  #aboutModal.m-about .about-slogan{
+    margin: 7px 0 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--txt-3);
+  }
+  #aboutModal.m-about .about-verline{
+    margin-top: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  #aboutModal.m-about .ab-label{ font-size: 12px; color: var(--txt-3); }
+  #aboutModal.m-about .ab-pill{
+    display: inline-flex; align-items: center;
+    height: 24px;
+    padding: 0 9px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--txt-2);
+    font-size: 11.5px;
+    font-weight: 500;
+  }
+  #aboutModal.m-about .ab-pill.accent{
+    background: var(--accent-2);
+    color: var(--accent);
+    border-color: transparent;
+  }
+  #aboutModal.m-about .ab-pill.update{
+    cursor: pointer;
+    box-shadow: 0 2px 8px -3px color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  /* display:inline-flex 会压过 hidden 属性的 UA display:none，必须显式拦住 */
+  #aboutModal.m-about .ab-pill[hidden],
+  #aboutModal.m-about .about-sponsor[hidden]{ display: none !important; }
+  /* 爱发电入口：和版权页的外链按钮同一套"可点"语言（品牌色淡底） */
+  #aboutModal.m-about .ab-sponsor-pill{
+    gap: 4px;
+    padding: 0 10px;
+    border-color: transparent;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    color: var(--accent);
+    text-decoration: none;
+  }
+  #aboutModal.m-about .ab-sponsor-pill .ico{ width: 13px; height: 13px; }
+
+  /* 分段控件：页签与「电脑端 / 手机端」同一套语言（bg 底 + inset 描边 + 白色滑块） */
+  #aboutModal.m-about .ab-tab{
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    margin-bottom: 14px;
+    border-radius: 12px;
+    background: var(--bg);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  #aboutModal.m-about .ab-tab button{
+    flex: 1 1 0;
+    height: 36px;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    color: var(--txt-3);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+  }
+  #aboutModal.m-about .ab-tab button.on{
+    background: var(--panel);
+    color: var(--txt);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(20,24,32,.10), inset 0 0 0 1px var(--line);
+  }
+  #aboutModal.m-about .ab-seg{
+    display: inline-flex;
+    gap: 3px;
+    margin: 0 0 12px;
+    padding: 3px;
+    border-radius: 11px;
+    background: var(--bg);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  #aboutModal.m-about .ab-seg button{
+    height: 30px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--txt-3);
+    font: inherit;
+    font-size: 12.5px;
+  }
+  #aboutModal.m-about .ab-seg button.on{
+    background: var(--panel);
+    color: var(--txt);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(20,24,32,.08);
+  }
+
+  /* 发布卡片：跟历史记录同一套卡片规格 */
+  #aboutModal.m-about .ab-releases{
+    max-height: none;
+    padding: 0;
+    gap: 10px;
+    overflow: visible;
+  }
+  #aboutModal.m-about .ab-rel{
+    padding: 13px 14px;
+    border: none;
+    border-radius: 16px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(20,24,32,.04);
+  }
+  #aboutModal.m-about .ab-rel-h{ display: flex; align-items: center; gap: 8px; }
+  #aboutModal.m-about .ab-ver{ font-size: 13px; font-weight: 700; color: var(--accent); }
+  #aboutModal.m-about .ab-pre{
+    height: 18px;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    line-height: 18px;
+    background: color-mix(in srgb, var(--warn, #d97706) 14%, transparent);
+    color: var(--warn, #d97706);
+  }
+  #aboutModal.m-about .ab-date{ margin-left: auto; font-size: 11px; color: var(--txt-3); }
+  #aboutModal.m-about .ab-name{ margin-top: 5px; font-size: 13px; font-weight: 600; color: var(--txt); }
+  #aboutModal.m-about .ab-rel .ab-p{ margin: 5px 0 0; }
+  #aboutModal.m-about .ab-rel .ab-p,
+  #aboutModal.m-about .ab-ul li{ font-size: 12.5px; line-height: 1.7; color: var(--txt-2); }
+  #aboutModal.m-about .ab-ul{
+    margin: 6px 0 0;
+    padding-left: 17px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  #aboutModal.m-about .ab-ul li::marker{ color: var(--accent); }
+
+  #aboutModal.m-about .ab-hint{
+    padding: 16px;
+    border: none;
+    border-radius: 16px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--line);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--txt-2);
+  }
+  #aboutModal.m-about .ab-hint.bad{
+    color: var(--danger);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 28%, transparent);
+  }
+
+  #aboutModal.m-about .about-legal{
+    padding: 14px;
+    border-radius: 16px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  #aboutModal.m-about .about-legal .ab-p{ margin: 0 0 9px; font-size: 12.5px; line-height: 1.8; color: var(--txt-2); }
+  #aboutModal.m-about .about-legal .ab-links{
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 0;
+  }
+  #aboutModal.m-about .about-legal .ab-links a{
+    display: inline-flex; align-items: center;
+    min-height: 32px;
+    padding: 0 10px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
+    color: var(--accent);
+    font-weight: 500;
+    text-decoration: none;
+  }
+  #aboutModal.m-about .about-legal .ab-links span{ display: none; }
+  #aboutModal.m-about .ab-hint-inline{ font-size: 12px; color: var(--txt-3); }
+  #aboutModal.m-about .ab-tp{
+    margin-top: 16px;
+    padding-top: 13px;
+    border-top: 1px solid var(--line-2);
+  }
+  #aboutModal.m-about .ab-tp-t{
+    margin-bottom: 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    color: var(--txt-3);
+  }
+  #aboutModal.m-about .ab-tp ul{
+    list-style: none;
+    margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  #aboutModal.m-about .ab-tp li{
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--txt-2);
+  }
+  #aboutModal.m-about .ab-tp li b{ font-weight: 600; color: var(--txt); }
+  #aboutModal.m-about .ab-tp li span{
+    flex: none;
+    font-size: 11.5px;
+    color: var(--txt-3);
+    text-align: right;
+  }
+
+  #aboutModal.m-about .about-sponsor{
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: none;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--line);
+    display: flex; align-items: center; gap: 12px;
+    text-decoration: none;
+  }
+  #aboutModal.m-about .about-sponsor:active{ background: var(--hover); }
+  #aboutModal.m-about .about-sponsor .ab-heart{
+    width: 34px; height: 34px; padding: 8px;
+    border-radius: 11px;
+    background: var(--accent);
+    color: #fff;
+    flex: none;
+  }
+  #aboutModal.m-about .ab-sp-t{ flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  #aboutModal.m-about .ab-sp-t b{ font-size: 13.5px; color: var(--txt); }
+  #aboutModal.m-about .ab-sp-t small{ font-size: 11px; color: var(--txt-3); }
+  #aboutModal.m-about .about-go{ color: var(--txt-3); flex: none; }
+
+  /* =========================================================
+     五、按钮统一
+     ---------------------------------------------------------
+     这三页里只出现三种按钮，形状语言一致（同一半径体系、同一字重）：
+       次级   panel 底 + 1px 描边 + 13px/500   → 测试连接、获取列表、重试
+       危险   淡红底 + 红字，无描边            → 清空全部
+       分段   bg 底 + inset 描边 + 白色滑块     → 关于页页签
+     图标按钮（返回）统一 44×44 命中区。
+     ========================================================= */
+  #aboutModal.m-about .ab-retry{
+    margin-top: 10px;
+    height: 34px;
+    padding: 0 16px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: var(--panel);
+    color: var(--txt);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  #aboutModal.m-about .ab-retry:active{ background: var(--hover); }
+  .m-back{ width: 44px; height: 44px; border-radius: 12px; }
+}
+
+@keyframes hjPgRootIn{
+  from{ opacity: 0; transform: translateY(6px); }
+  to{ opacity: 1; transform: none; }
+}
+@keyframes hjPgSubIn{
+  from{ opacity: 0; transform: translateX(14px); }
+  to{ opacity: 1; transform: none; }
+}
+@keyframes hjPgCardIn{
+  from{ opacity: 0; transform: translateY(8px) scale(.994); }
+  to{ opacity: 1; transform: none; }
+}
+
+@media (max-width:760px) and (prefers-reduced-motion:reduce){
+  .m-set-root:not(.hide),
+  .m-set-page.show,
+  #histModal.m-hist .hist-row{ animation: none !important; }
+  .m-set-row .chev{ transition: none; }
+}

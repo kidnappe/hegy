@@ -20,7 +20,7 @@ const settingsPath = path.join(process.env.USERPROFILE || os.homedir(), '.hegy',
 const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 const CFG = settings.model;
 
-// 按题目要点拟的代表题（原表只有要点，没有逐字原题）。
+// 按 HANDOVER §63.20 的题目要点拟的代表题（原表只有要点，没有逐字原题）。
 const cases = [
   { id: 'G01', grade: '高二', topic: '线面平行判定', question: '在四棱锥 P-ABCD 中，底面 ABCD 是平行四边形，AC 与 BD 交于点 O，E 为 PC 的中点。求证：PA ∥ 平面 BDE。' },
   { id: 'G02', grade: '高二', topic: '线面平行性质', question: '已知直线 a ∥ 平面 α，a ⊂ 平面 β，平面 α ∩ 平面 β = b。求证：a ∥ b。' },

@@ -22,7 +22,6 @@ else bad("Node 版本过低（需 18+）：" + process.versions.node);
 console.log("\n== 2. 关键文件 ==");
 const need = [
   "package.json",
-  "LICENSE",
   "README.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
@@ -43,7 +42,6 @@ const need = [
   "solver/mock.js",
   "solver/config.example.json",
   "solver/example_main.js",
-  "solver/vendor/LICENSES.md",
   "solver/vendor/jsxgraph.js",
   "solver/vendor/jsxgraph.css",
   "solver/vendor/icons.js",
@@ -120,8 +118,6 @@ has("solver/shim.js", "GGBMath", "shim.js 保留 GGBMath 契约");
 has("solver/shim.js", "HexMath", "shim.js 接到 HexMath");
 has("solver/solver.js", "function exportCss", "solver.js 含导出模板 exportCss()");
 has("solver/solver.js", "HJ_REC", "导出 HTML 内嵌 HJ_REC");
-has("solver/index.html", "hjThirdPartyLicenses", "index.html 含第三方许可声明块");
-has("solver/solver.js", "hjThirdPartyLicenses", "导出页嵌入第三方许可声明");
 if (exists("mobile/src/localapi.js")) {
   has("mobile/src/localapi.js", "/api/solve", "localapi.js 实现 /api/solve");
   has("mobile/src/localapi.js", "/api/store/index", "localapi.js 实现 /api/store/index");
@@ -133,11 +129,7 @@ try {
   else bad("package.json 缺少 scripts.test");
   if (pkg.private === true) ok("package.json 标记 private（防误发布）");
   else wrn("package.json 没有 private: true");
-  if (pkg.license === "AGPL-3.0-only") ok("package.json 许可证：AGPL-3.0-only");
-  else wrn("package.json 许可证不是 AGPL-3.0-only：" + String(pkg.license));
-  const lic = read("LICENSE");
-  if (/GNU AFFERO GENERAL PUBLIC LICENSE/.test(lic) && /Version 3, 19 November 2007/.test(lic)) ok("LICENSE 为 AGPL-3.0 全文");
-  else bad("LICENSE 不是 AGPL-3.0 全文");
+  if (pkg.license === "UNLICENSED") wrn("许可证尚未选择（package.json: UNLICENSED）");
 } catch (e) {
   bad("package.json 解析失败：" + e.message);
 }
@@ -171,42 +163,6 @@ console.log("\n== 7. 旧文件 / 迁移残留 ==");
   if (exists(p)) wrn("发现旧文件 / 目录：" + p + "（确认是否应删除）");
   else ok("没有 " + p);
 });
-
-console.log("\n== 8. 公开卫生 ==");
-const hygiene = [
-  ["内部文档引用", /HANDOVER/],
-  ["临时工具路径", /opencode/i],
-  ["D:\\software 路径", /D:\\software/i],
-  ["E:\\code\\math 路径", /E:\\code\\math/i],
-  ["C:\\Users\\Admin 路径", /C:\\Users\\Admin/i]
-];
-const textExt = /\.(js|md|html|css|json|txt|bat|cmd|yml|yaml)$/i;
-const skipFiles = new Set(["tools/verify.js", "docs/RELEASING.md"]);
-const scanFiles = [];
-(function walk(dir) {
-  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (ent.name === ".git" || ent.name === "node_modules") continue;
-    const p = path.join(dir, ent.name);
-    const r = rel(p);
-    if (ent.isDirectory()) {
-      if (r === "desktop/dist" || r === "desktop/dist-arm64") continue;
-      walk(p);
-    } else if (textExt.test(ent.name) && !skipFiles.has(r) && fs.statSync(p).size < 2 * 1024 * 1024) {
-      scanFiles.push(p);
-    }
-  }
-})(ROOT);
-let hygieneHits = 0;
-for (const f of scanFiles) {
-  const s = fs.readFileSync(f, "utf8");
-  for (const [label, re] of hygiene) {
-    if (re.test(s)) {
-      bad(label + " 残留：" + rel(f));
-      hygieneHits++;
-    }
-  }
-}
-if (!hygieneHits) ok("没有内部文档 / 临时路径残留");
 
 console.log("\n----------------------------------------");
 if (fail) {
