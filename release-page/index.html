@@ -177,15 +177,17 @@ h2{font-size:clamp(36px,3.45vw,55px);line-height:1.16;}
 .dl-hint{
   margin-top:10px;font-family:var(--sans);font-size:11.5px;line-height:1.8;
   letter-spacing:.02em;color:#3c456b;max-width:360px;
+  background:rgba(255,255,255,.55);border:1px solid var(--rule-soft);border-radius:2px;padding:9px 11px;
 }
 .dl-hint b{font-weight:600;color:#2a2774;}
 .dl-doc{
   display:inline-flex;align-items:center;gap:7px;margin-top:14px;
   font-family:var(--serif);font-size:14px;font-weight:600;letter-spacing:.04em;color:#2a2774;
-  text-decoration:none;border-bottom:2px solid rgba(56,53,140,.55);padding-bottom:3px;
-  transition:color .2s,border-color .2s;
+  text-decoration:none;border-bottom:2px solid rgba(56,53,140,.55);padding:6px 10px 4px;
+  background:rgba(255,255,255,.55);border-radius:2px 2px 0 0;
+  transition:color .2s,border-color .2s,background .2s;
 }
-.dl-doc:hover{color:var(--indigo);border-color:var(--indigo);}
+.dl-doc:hover{color:var(--indigo);border-color:var(--indigo);background:rgba(255,255,255,.8);}
 .scrollhint{
   display:flex;align-items:center;gap:10px;margin-top:clamp(24px,4vh,42px);
   font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;color:var(--muted);
