@@ -1,6 +1,6 @@
 {
   "name": "hejie-mobile",
-  "version": "0.1.0",
+  "version": "1.2.1",
   "private": true,
   "description": "何解 Android MVP (Capacitor)",
   "scripts": {

@@ -1246,6 +1246,8 @@ html[data-theme="dark"] .log-item{border-color:var(--line);}
   padding:12px 18px;border-top:1px solid var(--line-2);background:var(--panel-2);
 }
 .mfoot .grow{flex:1;font-size:12px;color:var(--txt-3);}
+/* 底栏按钮不参与压缩：左侧提示是 flex:1，文案一长就把「测试连接/取消/保存」挤成竖排 */
+.mfoot>button{flex:none;}
 .modal.modal-lg .msg{padding:0 18px 12px;}
 .modal h2{font-size:15.5px;margin:0 0 4px;}
 .modal .sub{font-size:12px;color:var(--txt-3);margin-bottom:16px;line-height:1.7;}

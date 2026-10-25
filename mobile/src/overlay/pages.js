@@ -152,8 +152,11 @@
     hero.appendChild(el("p", null, "模型、外观与本地记录"));
     root.appendChild(hero);
 
+    var wizRow = row("wizard", "配置向导", "三步走：服务商 → Key → 模型", "i-wand-2");
+    wizRow.querySelector(".v").textContent = "3 步";
     root.appendChild(group("解题", [
       row("model", "模型配置", "服务商、Key、模型", "i-sparkles"),
+      wizRow,
       row("view", "画法", "真实尺寸 / 像题图", "i-ruler")
     ]));
     root.appendChild(group("界面", [
@@ -382,6 +385,12 @@
       if (!b) return;
       var go = b.dataset.go;
       if (go === "about") { if (window.HJAbout) window.HJAbout.open(); return; }
+      if (go === "wizard") {
+        // 设置里重开三步向导：向导层（z 90）压在设置之上，关掉就回到设置列表。
+        // 不改设置面板本身的状态，所以「稍后」也不会把用户丢回首页。
+        if (window.HJPages && window.HJPages.wizard) window.HJPages.wizard();
+        return;
+      }
       if (go === "records") { showSub("records"); return; }
       if (go === "appearance") { showSub("appearance"); return; }
       if (go === "diag") { showSub("diag"); return; }

@@ -6049,5 +6049,17 @@
       if (n) $("status").textContent = "已把 " + n + " 条旧记录搬到记录文件夹，位置可在「设置」里看";
       loadHistory();
     });
+    // 没有模型就等于不能解题：启动直接把设置弹出来，并把焦点落在服务商上。
+    // 桌面窗口放不下手机端那套整屏三步向导，这里用「一屏手风琴 + 顺序提示」代替。
+    var c0 = loadCfg();
+    var ready0 = !!(c0 && c0.baseUrl && c0.apiKey && c0.model);
+    if (!ready0) {
+      openModal("model");
+      // 空配置先落到第一个真实服务商（与手机端首启向导一致），别让用户对着空下拉发呆
+      if (!c0 || !c0.baseUrl) { if (presetSel.options.length > 1) { presetSel.value = "1"; presetSel.onchange(); } }
+      var m0 = $("cfgMsg");
+      if (m0) { m0.className = "msg"; m0.textContent = "按顺序：服务商 → Key → 模型"; }
+      try { $("fPreset").focus(); } catch (e) {}
+    }
   });
 })();
