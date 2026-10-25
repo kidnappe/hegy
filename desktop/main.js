@@ -6,6 +6,7 @@ const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
 const http = require("http");
+const https = require("https");
 
 const APP_ICON = path.join(__dirname, "build", "icon.png");
 
@@ -90,6 +91,29 @@ function sendUpdateEvent(event, payload) {
 
 ipcMain.handle("hegy:update-download", updateDownload);
 ipcMain.handle("hegy:update-install", updateInstall);
+
+/* ============ 关于页更新记录：主进程直连拉取 api.github.com ============
+   渲染进程的 fetch 走系统代理——共享代理出口 IP 的 GitHub 未认证限额（60 次/小时/IP）常被打满，
+   「更新记录」因此 403。Node 的 https 模块不读系统代理、天然直连；页面优先走这条路，
+   失败再退回渲染进程 fetch。注意不能用 electron 的 net 模块（走 Chromium 网络栈 = 系统代理）。 */
+function aboutFetch(_e, rawUrl, etag) {
+  return new Promise((resolve) => {
+    let u;
+    try { u = new URL(String(rawUrl || "")); } catch (err) { resolve({ status: 0, error: "bad-url" }); return; }
+    if (u.protocol !== "https:" || u.host !== "api.github.com") { resolve({ status: 0, error: "bad-url" }); return; }
+    const headers = { "Accept": "application/vnd.github+json", "User-Agent": "Hegy-About" };
+    if (etag) headers["If-None-Match"] = String(etag);
+    const req = https.get({ host: u.host, path: u.pathname + u.search, headers, timeout: 15000 }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (c) => { body += c; });
+      res.on("end", () => resolve({ status: res.statusCode, etag: res.headers.etag || "", body: body }));
+    });
+    req.on("timeout", () => { req.destroy(new Error("timeout")); });
+    req.on("error", (err) => resolve({ status: 0, error: String((err && err.message) || err) }));
+  });
+}
+ipcMain.handle("hegy:about-fetch", aboutFetch);
 
 function updateDownload(event, rawUrl) {
   return new Promise((resolve) => {

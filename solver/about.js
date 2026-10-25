@@ -84,8 +84,8 @@
     } catch (e) {}
     return null;
   }
-  function writeCache(list) {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), list: list })); } catch (e) {}
+  function writeCache(list, etag) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), list: list, etag: etag || "" })); } catch (e) {}
   }
   function splitEnds(list) {
     var desktop = [], mobile = [];
@@ -95,22 +95,45 @@
     });
     return { desktop: desktop, mobile: mobile };
   }
-  function fetchReleases(cb) {
+  /* 统一返回 Promise<{status, etag, body}>。桌面壳优先走主进程直连（渲染进程 fetch 走系统代理，
+     共享出口 IP 常被 GitHub 限流 403；Node 主进程不读系统代理）；主进程网络失败退回渲染进程 fetch。 */
+  function ghFetch(url, etag) {
+    var browserFetch = function () {
+      var h = { "Accept": "application/vnd.github+json" };
+      if (etag) h["If-None-Match"] = etag;
+      return fetch(url, { headers: h }).then(function (r) {
+        return r.text().then(function (b) { return { status: r.status, etag: r.headers.get("etag") || "", body: b }; });
+      });
+    };
+    var d = desk();
+    if (d && d.aboutFetch) {
+      return d.aboutFetch(url, etag).then(function (res) {
+        if (!res || res.error) return browserFetch();
+        return res;
+      }).catch(browserFetch);
+    }
+    return browserFetch();
+  }
+  function fetchReleases(cb, force) {
     if (!CFG.repo) { cb(new Error("no-repo")); return; }
     var cached = readCache();
-    if (cached && Date.now() - cached.t < TTL) { cb(null, cached.list, true); return; }
-    fetch("https://api.github.com/repos/" + CFG.repo + "/releases?per_page=30", {
-      headers: { "Accept": "application/vnd.github+json" }
-    }).then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
-    }).then(function (list) {
+    if (!force && cached && Date.now() - cached.t < TTL) { cb(null, cached.list, true); return; }
+    /* 带缓存 etag 走条件请求：内容没变时 GitHub 回 304，不计入限流额度（未认证 60 次/小时/IP） */
+    ghFetch("https://api.github.com/repos/" + CFG.repo + "/releases?per_page=30", (cached && cached.etag) || "")
+    .then(function (res) {
+      if (!res) throw new Error("bad payload");
+      if (res.status === 304 && cached) { writeCache(cached.list, cached.etag); cb(null, cached.list, true); return; }
+      if (res.status === 403 || res.status === 429) {
+        throw new Error(/rate limit/i.test(res.body || "")
+          ? "HTTP " + res.status + " · GitHub 接口限流（共享代理出口 IP 常被打满，未认证 60 次/小时/IP）——稍后再试，或暂时直连"
+          : "HTTP " + res.status + " · 代理或网络拦截了 api.github.com，试试更换代理节点或直连");
+      }
+      if (res.status !== 200) throw new Error("HTTP " + res.status);
+      var list = JSON.parse(res.body);
       if (!Array.isArray(list)) throw new Error("bad payload");
-      writeCache(list);
+      writeCache(list, res.etag);
       cb(null, list, false);
-    }).catch(function (e) {
-      cb(e, cached ? cached.list : null, false);
-    });
+    }).catch(function (e) { cb(e, cached ? cached.list : null, false); });
   }
 
   /* ---------- Release 正文（Markdown 列表 → 轻量 HTML） ---------- */
@@ -244,7 +267,7 @@
       return;
     }
     var html = "";
-    if (state.listErr && state.list) html += box("ab-hint", "网络不通，下面是本地缓存。");
+    if (state.listErr && state.list) html += box("ab-hint", "拉取未成功（可能被限流），以下为本地缓存。");
     for (var i = 0; i < arr.length; i++) html += releaseRow(arr[i]);
     host.innerHTML = html;
   }
@@ -292,11 +315,12 @@
     }
   }
 
-  function loadLog(force) {
-    if (!CFG.repo) { renderLog(); return; }
+  function loadLog(force, done) {
+    function finish(err) { if (done) done(err || null); }
+    if (!CFG.repo) { renderLog(); finish(); return; }
     var cached = readCache();
     if (!force && cached && Date.now() - cached.t < TTL) {
-      state.list = cached.list; state.listErr = null; renderLog(); renderVer(); return;
+      state.list = cached.list; state.listErr = null; renderLog(); renderVer(); finish(); return;
     }
     if (!force && cached) { state.list = cached.list; state.listErr = null; renderLog(); renderVer(); }
     state.listErr = null;
@@ -306,7 +330,8 @@
       state.list = list || state.list;
       renderLog();
       renderVer();
-    });
+      finish(err);
+    }, force);
   }
 
   /* ---------- 打开 / 关闭（对齐既有弹层习惯：rAF 加 .show） ---------- */
@@ -386,6 +411,20 @@
     var seg = m.querySelectorAll(".ab-seg button");
     for (var j = 0; j < seg.length; j++) {
       seg[j].addEventListener("click", function () { setEnd(this.dataset.end); });
+    }
+    /* 刷新：绕过 30 分钟缓存重新拉一次；拉取期间图标转圈，结束（成功或失败）后停下。
+       失败时不动按钮——列表区自己会显示「加载失败 + 重试」。 */
+    var rf = $("aboutRefresh");
+    if (rf) {
+      rf.addEventListener("click", function () {
+        if (rf.classList.contains("busy")) return;
+        rf.classList.add("busy");
+        loadLog(true, function () {
+          rf.classList.remove("busy");
+          rf.classList.toggle("ok", !state.listErr);
+          setTimeout(function () { rf.classList.remove("ok"); }, 1200);
+        });
+      });
     }
     var sp = $("aboutAfdian");
     if (sp) {

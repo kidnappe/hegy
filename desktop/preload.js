@@ -8,6 +8,9 @@ window.HEGY_DESKTOP = {
   downloadUpdate: (url) => ipcRenderer.invoke("hegy:update-download", url),
   // 拉起已下载的安装器并退出本应用，返回 Promise<{ok, error?}>
   installUpdate: () => ipcRenderer.invoke("hegy:update-install"),
+  // 更新记录拉取：主进程直连 api.github.com（绕开系统代理的共享 IP 限流 403），
+  // 返回 Promise<{status:number, etag:string, body:string, error?}>
+  aboutFetch: (url, etag) => ipcRenderer.invoke("hegy:about-fetch", url, etag),
   // 订阅更新事件（目前只有 { type: "progress", pct, received, total }），返回取消订阅函数
   onUpdateEvent: (cb) => {
     const h = (_e, data) => { try { cb(data); } catch (err) {} };
