@@ -1792,21 +1792,9 @@ function frame(now){
 /* ---------- 移动端：演示图「钉进页面」 ----------
    每屏文案下方放一个 .appDock 槽位，#app 嵌在当前屏的槽里随页面滚动（不再是视口固定层）；
    槽位滚出视野后把 #app 搬到相邻屏的槽位——用户看到的永远是「内容里的演示卡」。
-   dock 按 DOCK_VIEWS 裁切聚焦：不旋转（摆正），只放大该屏相关区域保证信息可读。
+   整图缩放（宽≈92vw）、摆正不旋转（用户拍板：按倾斜版尺寸放置摆正的整卡，不做裁切聚焦）。
    末屏（下载/COLOPHON）不放槽位，屏幕让给下载区与巨字。桌面端保持视口旅行系统不变。 */
 const stage = $('#stage');
-/* 聚焦区域（应用坐标 1240×800；三栏：左栏 0–224 / 画布 229–860 / 右栏 860–1240）：
-   输入屏看欢迎卡、图形屏看画布、解答/微调/追问屏看右栏面板（380px 面板≈0.95 倍，文字可读） */
-const DOCK_VIEWS = [
-  { x: 300, y: 240, w: 620, h: 460 },
-  { x: 300, y: 240, w: 620, h: 460 },
-  { x: 229, y: 52, w: 631, h: 720 },
-  { x: 229, y: 52, w: 631, h: 720 },
-  { x: 860, y: 52, w: 380, h: 720 },
-  { x: 860, y: 52, w: 380, h: 720 },
-  { x: 860, y: 52, w: 380, h: 720 },
-  { x: 229, y: 52, w: 631, h: 720 }
-];
 let dockIdx = -1;
 function ensureDocks(){
   scenes.forEach((sc, i) => {
@@ -1821,12 +1809,11 @@ function ensureDocks(){
 function applyDockTransform(i){
   const dock = scenes[i] && scenes[i].querySelector('.appDock');
   if (!dock) return;
-  const v = DOCK_VIEWS[i] || { x: 0, y: 0, w: 1240, h: 800 };
-  const k = dock.clientWidth / v.w;
-  dock.style.aspectRatio = v.w + ' / ' + v.h;
+  const s = dock.clientWidth / 1240;
+  dock.style.aspectRatio = '1240 / 800';
   app.style.transformOrigin = '0 0';
   app.style.transition = 'none';
-  app.style.transform = 'translate(' + (-v.x * k).toFixed(2) + 'px,' + (-v.y * k).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
+  app.style.transform = 'scale(' + s.toFixed(4) + ')';
 }
 function dockTo(i){
   if (i === dockIdx || i < 0) return;
